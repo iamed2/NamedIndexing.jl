@@ -1,0 +1,7 @@
+name = "NamedIndexing"
+uuid = "2ec58d1c-9a24-11e8-38a0-d53aa7f82dfa"
+authors = ["Eric Davies <iamed2@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
