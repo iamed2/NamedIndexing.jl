@@ -12,10 +12,15 @@ using NamedIndexing
         @test Acolons.data == A.data
 
         i, j = rand(1:size(A, 1)), rand(1:size(A, 2))
-        @test A[i, j] == A.data[i, j]
+        @test @inferred(A[i, j]) == A.data[i, j]
 
         i = rand(1:length(A))
         @test A[i] == A.data[i]
+
+        @test all(A[foo=1] .== A.data[1, :])
+        @test axisnames(A[foo=1]) == (:bar, )
+        @test all(A[bar=2] .== A.data[:, 2])
+        @test axisnames(A[bar=2]) == (:foo, )
     end
 
     @testset "Set index" begin

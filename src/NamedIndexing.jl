@@ -19,7 +19,8 @@ is_scalar_index(::Char) = true
 is_scalar_index(::AbstractString) = true
 is_scalar_index(::Any) = false
 
-function Base.getindex(AA::NamedAxisArray{T, N, A, Names}, axinds::IndAx) where {T, N, A, Names, IndAx<:NamedTuple}
+function Base.getindex(AA::NamedAxisArray{T, N, A, Names},
+                       axinds::NamedTuple) where {T, N, A, Names}
     fullinds = merge(
         NamedTuple{Names, NTuple{N, Colon}}(ntuple((_) -> (:), Val{N}())),
         axinds
@@ -31,10 +32,11 @@ function Base.getindex(AA::NamedAxisArray{T, N, A, Names}, axinds::IndAx) where 
     end
 
     newdata = getindex(AA.data, fullinds...)
+    newdata isa eltype(AA.data) && return newdata
 
-    #  newnames = Tuple(name for (name, index) in zip(Names, fullinds)
-                     #  if is_scalar_index(index))
-    #  NamedAxisArray(newdata, newnames)
+    newnames = Tuple(name for (name, index) in zip(Names, fullinds)
+                     if !is_scalar_index(index))
+    NamedAxisArray(newdata, newnames)
 end
 
 Base.getindex(AA::NamedAxisArray; kwargs...) = getindex(AA, kwargs.data)
