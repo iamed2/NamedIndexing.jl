@@ -13,18 +13,34 @@ end
 
 Base.size(AA::NamedAxisArray) = size(AA.data)
 
-is_scalar_index(::Number) = true
-is_scalar_index(::Symbol) = true
-is_scalar_index(::Char) = true
-is_scalar_index(::AbstractString) = true
-is_scalar_index(::Any) = false
+is_scalar_index(::Type{<:Number}) = true
+is_scalar_index(::Type{Symbol}) = true
+is_scalar_index(::Type{<:AbstractChar}) = true
+is_scalar_index(::Type{<:AbstractString}) = true
+is_scalar_index(a::Any) = is_scalar_index(typeof(a))
+is_scalar_index(::Type) = false
+
+
+const ScalarTypes = Union{Number, Symbol, Char, AbstractString}
+function _reduced_names(names::NamedTuple{N, T}) where {N, T}
+    if @generated
+        newnames = Tuple(n for (n, t) in zip(N, T.parameters) if !is_scalar_index(t))
+        :($newnames)
+    else
+        Tuple(n for (n, t) in zip(N, T.parameters) if !is_scalar_index(t))
+    end
+end
+_from_data_and_names(data::Any, ::Tuple{}) = data
+function _from_data_and_names(data::AbstractArray, names::Tuple)
+    NamedAxisArray(data, names)
+end
 
 function Base.getindex(AA::NamedAxisArray{T, N, A, Names},
                        axinds::NamedTuple) where {T, N, A, Names}
     fullinds = merge(
-        NamedTuple{Names, NTuple{N, Colon}}(ntuple((_) -> (:), Val{N}())),
-        axinds
-    )
+                     NamedTuple{Names, NTuple{N, Colon}}(ntuple((_) -> (:), Val{N}())),
+                     axinds
+                    )
 
     fullkeys = keys(fullinds)
     if fullkeys != Names
@@ -32,11 +48,8 @@ function Base.getindex(AA::NamedAxisArray{T, N, A, Names},
     end
 
     newdata = getindex(AA.data, fullinds...)
-    newdata isa eltype(AA.data) && return newdata
-
-    newnames = Tuple(name for (name, index) in zip(Names, fullinds)
-                     if !is_scalar_index(index))
-    NamedAxisArray(newdata, newnames)
+    newnames = _reduced_names(fullinds)
+    _from_data_and_names(newdata, newnames)
 end
 
 Base.getindex(AA::NamedAxisArray; kwargs...) = getindex(AA, kwargs.data)
