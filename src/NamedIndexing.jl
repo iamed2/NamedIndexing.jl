@@ -7,31 +7,36 @@ struct NamedAxisArray{T, N, A<:AbstractArray{T, N}, Names} <: AbstractArray{T, N
     data::A
 end
 
-function NamedAxisArray(data::A, names::NTuple{N, Symbol}) where {T, N, A<:AbstractArray{T, N}}
-    NamedAxisArray{T, N, A, names}(data)
+function NamedAxisArray(data::AbstractArray{T, N}, names::NTuple{N, Symbol}) where {T, N}
+    NamedAxisArray{T, N, typeof(data), names}(data)
 end
 
 Base.size(AA::NamedAxisArray) = size(AA.data)
+Base.getindex(AA::NamedAxisArray; kwargs...) = getindex(AA, kwargs.data)
+Base.ndims(AA::NamedAxisArray{T, N}) where {T, N} = N
+@inline axisnames(AA::NamedAxisArray{T, N, A, Names}) where {T, N, A, Names} = Names
 
-function Base.getindex(AA::NamedAxisArray{T, N, A, Names}, axinds::IndAx) where {T, N, A, Names, IndAx<:NamedTuple}
+function isscalar(axes::Union{Number)
+end
+
+function Base.getindex(array::NamedAxisArray, axinds::NamedTuple)
+    NT = NamedTuple{axisnames(array), NTuple{ndims(array), Colon}}
     fullinds = merge(
-        NamedTuple{Names, NTuple{N, Colon}}(ntuple((_) -> (:), Val{N}())),
-        axinds
+         NT(ntuple((_) -> (:), Val{array}())),
+         axinds
     )
 
     fullkeys = keys(fullinds)
-    if fullkeys != Names
-        throw(ArgumentError("Unexpected named indexes $(setdiff(fullkeys, Names))"))
+    if fullkeys != axisnames(array)
+        msg = "Unexpected named indexes $(setdiff(fullkeys, axisnames(array)))"
+        throw(ArgumentError(msg))
     end
 
-    newdata = getindex(AA.data, fullinds...)
+    newdata = getindex(array.data, fullinds...)
 
     # falls apart if you do APL-style reshaping with indexes
     NamedAxisArray{T, N, A, Names}(newdata)
 end
 
-Base.getindex(AA::NamedAxisArray; kwargs...) = getindex(AA, kwargs.data)
-
-axisnames(AA::NamedAxisArray{T, N, A, Names}) where {T, N, A, Names} = Names
 
 end # module
