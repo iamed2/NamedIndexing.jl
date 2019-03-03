@@ -1,4 +1,4 @@
-name = "NamedIndexing"
+name = "LabeledArrays"
 uuid = "2ec58d1c-9a24-11e8-38a0-d53aa7f82dfa"
 authors = ["Eric Davies <iamed2@gmail.com>"]
 version = "0.1.0"

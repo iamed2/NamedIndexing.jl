@@ -1,32 +1,34 @@
-module NamedIndexing
+module LabeledArrays
 using Random
 
-export NamedAxisArray
-export axisnames
+export LabeledArray
+export labels
 
-struct NamedAxisArray{T, N, A <: AbstractArray{T, N}, Names} <: AbstractArray{T, N}
+struct LabeledArray{T, N, A <: AbstractArray{T, N}, Names} <: AbstractArray{T, N}
     data::A
 end
 
-function NamedAxisArray(data::AbstractArray{T, N1},
-                        names::NTuple{N2, Symbol}) where {T, N1, N2}
-    NamedAxisArray{T, N1, typeof(data), generate_axis_names(names, Val{N1}())}(data)
+function LabeledArray(data::AbstractArray{T, N1},
+                      names::NTuple{N2, Symbol}) where {T, N1, N2}
+    LabeledArray{T, N1, typeof(data), generate_axis_names(names, Val{N1}())}(data)
 end
 
-Base.IndexStyle(array::NamedAxisArray) = Base.IndexStyle(array.data)
-function Base.IndexStyle(array::Type{<: NamedAxisArray{T, N, A}}) where {T, N, A}
+const LabelledArray = LabeledArray # for the brit inside each of us
+
+Base.IndexStyle(array::LabeledArray) = Base.IndexStyle(array.data)
+function Base.IndexStyle(array::Type{<: LabeledArray{T, N, A}}) where {T, N, A}
     Base.IndexStyle(A)
 end
 
-Base.size(array::NamedAxisArray) = size(array.data)
-function Base.size(array::NamedAxisArray, axis::Symbol)
-    getproperty(NamedTuple{axisnames(array), NTuple{ndims(array), Int}}(size(array.data)),
+Base.size(array::LabeledArray) = size(array.data)
+function Base.size(array::LabeledArray, axis::Symbol)
+    getproperty(NamedTuple{labels(array), NTuple{ndims(array), Int}}(size(array.data)),
                 axis)
 end
-Base.getindex(array::NamedAxisArray; kwargs...) = getindex(array, kwargs.data)
-Base.ndims(array::NamedAxisArray{T, N}) where {T, N} = N
-@inline axisnames(array::NamedAxisArray{T, N, A, S}) where {T, N, A, S} = S
-@inline axisnames(array::Type{NamedAxisArray{T, N, A, S}}) where {T, N, A, S} = S
+Base.getindex(array::LabeledArray; kwargs...) = getindex(array, kwargs.data)
+Base.ndims(array::LabeledArray{T, N}) where {T, N} = N
+@inline labels(array::LabeledArray{T, N, A, S}) where {T, N, A, S} = S
+@inline labels(array::Type{LabeledArray{T, N, A, S}}) where {T, N, A, S} = S
 
 abstract type IndexType end
 struct DecayingIndex  <: IndexType end
@@ -61,7 +63,7 @@ const AUTO_AXIS_NAMES = let
 end
 
 """ Creates the full set of indices for the array """
-function fullindices(array::NamedAxisArray, indices::NamedTuple)
+function fullindices(array::LabeledArray, indices::NamedTuple)
     if @generated
         inames = fieldnames(indices)
 
@@ -75,11 +77,11 @@ function fullindices(array::NamedAxisArray, indices::NamedTuple)
             end
         end
 
-        items = [getname(name, i) for (i, name) in enumerate(axisnames(array))]
-        extras = [:($name=indices.$name) for name in inames if !(name in axisnames(array))]
+        items = [getname(name, i) for (i, name) in enumerate(labels(array))]
+        extras = [:($name=indices.$name) for name in inames if !(name in labels(array))]
         Expr(:tuple, items..., extras...)
     else
-        Names = axisnames(array)
+        Names = labels(array)
         N = ndims(array)
         merge(
             NamedTuple{Names, NTuple{N, Colon}}(ntuple((_) -> (:), Val{N}())),
@@ -104,29 +106,29 @@ function generate_axis_names(initial::NTuple{N1, Symbol},
     end
 end
 
-function generate_axis_names(array::NamedAxisArray, val::Val)
-    generate_axis_names(axisnames(array), val)
+function generate_axis_names(array::LabeledArray, val::Val)
+    generate_axis_names(labels(array), val)
 end
 
-@inline Base.getindex(array::NamedAxisArray, index::Int) = getindex(array.data, index)
-function Base.getindex(array::NamedAxisArray, I...)
+@inline Base.getindex(array::LabeledArray, index::Int) = getindex(array.data, index)
+function Base.getindex(array::LabeledArray, I...)
     indices = NamedTuple{generate_axis_names(array, Val{length(I)}()), typeof(I)}(I)
     getindex(array, indices)
 end
-function Base.getindex(array::NamedAxisArray, indices::NamedTuple)
+function Base.getindex(array::LabeledArray, indices::NamedTuple)
     fullinds = fullindices(array, indices)
     newdata = getindex(array.data, values(fullinds)...)
     _get_index(array, newdata, fullinds)
 end
 
-_get_index(array::NamedAxisArray{T}, newdata::T, ::NamedTuple) where T = newdata
-function _get_index(array::NamedAxisArray, newdata::AbstractArray, indices::NamedTuple)
+_get_index(array::LabeledArray{T}, newdata::T, ::NamedTuple) where T = newdata
+function _get_index(array::LabeledArray, newdata::AbstractArray, indices::NamedTuple)
     if @generated
         names = remaining_labels(array, indices)
         T  = eltype(newdata)
-        :(NamedAxisArray{$T, $(ndims(newdata)), $newdata, $names}(newdata))
+        :(LabeledArray{$T, $(ndims(newdata)), $newdata, $names}(newdata))
     else
-        NamedAxisArray(newdata, remaining_labels(typeof(array), typeof(indices)))
+        LabeledArray(newdata, remaining_labels(typeof(array), typeof(indices)))
     end
 end
 
