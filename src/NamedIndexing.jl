@@ -1,42 +1,135 @@
 module NamedIndexing
+using Random
 
 export NamedAxisArray
 export axisnames
 
-struct NamedAxisArray{T, N, A<:AbstractArray{T, N}, Names} <: AbstractArray{T, N}
+struct NamedAxisArray{T, N, A <: AbstractArray{T, N}, Names} <: AbstractArray{T, N}
     data::A
 end
 
-function NamedAxisArray(data::AbstractArray{T, N}, names::NTuple{N, Symbol}) where {T, N}
-    NamedAxisArray{T, N, typeof(data), names}(data)
+function NamedAxisArray(data::AbstractArray{T, N1},
+                        names::NTuple{N2, Symbol}) where {T, N1, N2}
+    NamedAxisArray{T, N1, typeof(data), generate_axis_names(names, Val{N1}())}(data)
 end
 
-Base.size(AA::NamedAxisArray) = size(AA.data)
-Base.getindex(AA::NamedAxisArray; kwargs...) = getindex(AA, kwargs.data)
-Base.ndims(AA::NamedAxisArray{T, N}) where {T, N} = N
-@inline axisnames(AA::NamedAxisArray{T, N, A, Names}) where {T, N, A, Names} = Names
-
-function isscalar(axes::Union{Number)
+Base.IndexStyle(array::NamedAxisArray) = Base.IndexStyle(array.data)
+function Base.IndexStyle(array::Type{<: NamedAxisArray{T, N, A}}) where {T, N, A}
+    Base.IndexStyle(A)
 end
 
-function Base.getindex(array::NamedAxisArray, axinds::NamedTuple)
-    NT = NamedTuple{axisnames(array), NTuple{ndims(array), Colon}}
-    fullinds = merge(
-         NT(ntuple((_) -> (:), Val{array}())),
-         axinds
-    )
+Base.size(array::NamedAxisArray) = size(array.data)
+function Base.size(array::NamedAxisArray, axis::Symbol)
+    getproperty(NamedTuple{axisnames(array), NTuple{ndims(array), Int}}(size(array.data)),
+                axis)
+end
+Base.getindex(array::NamedAxisArray; kwargs...) = getindex(array, kwargs.data)
+Base.ndims(array::NamedAxisArray{T, N}) where {T, N} = N
+@inline axisnames(array::NamedAxisArray{T, N, A, S}) where {T, N, A, S} = S
+@inline axisnames(array::Type{NamedAxisArray{T, N, A, S}}) where {T, N, A, S} = S
 
-    fullkeys = keys(fullinds)
-    if fullkeys != axisnames(array)
-        msg = "Unexpected named indexes $(setdiff(fullkeys, axisnames(array)))"
-        throw(ArgumentError(msg))
+abstract type IndexType end
+struct DecayingIndex  <: IndexType end
+struct VectorIndex  <: IndexType end
+
+""" Trait defining whether an index decays the dimension of the array """
+IndexType(array::AbstractArray, scalar::Any) = IndexType(typeof(array), typeof(scalar))
+IndexType(::Type{<:AbstractArray}, ::Type) = VectorIndex()
+IndexType(::Type{<:AbstractArray}, ::Type{<:Number}) = DecayingIndex()
+IndexType(::Type{<:AbstractArray}, ::Type{<:AbstractString}) = DecayingIndex()
+IndexType(::Type{<:AbstractArray}, ::Type{<:AbstractChar}) = DecayingIndex()
+IndexType(::Type{<:AbstractArray}, ::Type{<:Symbol}) = DecayingIndex()
+
+""" Tuple of remaining axes
+
+Also relables automated names to their location in the auto label list.
+"""
+function remaining_labels(array::Type{<:AbstractArray}, axes::Type{<:NamedTuple})
+    names = fieldnames(axes)
+    types = fieldtypes(axes)
+    tuple((n in AUTO_AXIS_NAMES ? AUTO_AXIS_NAMES[i] : n
+           for (i, (n, t)) in enumerate(zip(names, types))
+           if IndexType(array, t) isa VectorIndex)...)
+end
+
+""" Auto-generated axis name """
+const AUTO_AXIS_NAMES = let
+    names = ("lapin", "rat", "corbeau", "cochon", "saumon", "cafard", "dauphin")
+    attributes = ("rose", "noir", "abile", "séché", "salubre", "émue", "sucré")
+    a = [Symbol("_" * name * "_" * attribute) for name in names, attribute in attributes]
+    tuple(shuffle(a)...)
+end
+
+""" Creates the full set of indices for the array """
+function fullindices(array::NamedAxisArray, indices::NamedTuple)
+    if @generated
+        inames = fieldnames(indices)
+
+        getname(name, i) = begin
+            if name in inames
+                :($name = indices.$name)
+            elseif AUTO_AXIS_NAMES[i] in inames
+                :($name = indices.$(AUTO_AXIS_NAMES[i]))
+            else
+                :($name = Colon())
+            end
+        end
+
+        items = [getname(name, i) for (i, name) in enumerate(axisnames(array))]
+        extras = [:($name=indices.$name) for name in inames if !(name in axisnames(array))]
+        Expr(:tuple, items..., extras...)
+    else
+        Names = axisnames(array)
+        N = ndims(array)
+        merge(
+            NamedTuple{Names, NTuple{N, Colon}}(ntuple((_) -> (:), Val{N}())),
+            indices
+        )
     end
-
-    newdata = getindex(array.data, fullinds...)
-
-    # falls apart if you do APL-style reshaping with indexes
-    NamedAxisArray{T, N, A, Names}(newdata)
 end
+
+function generate_axis_names(initial::NTuple{N1, Symbol},
+                             ::Val{N2})::NTuple{N2, Symbol} where {N1, N2}
+    if @generated
+        Expr(:tuple,
+             (:(initial[$i]) for i in 1:min(N2, N1))...,
+             (QuoteNode(AUTO_AXIS_NAMES[i]) for i in N1 + 1:N2)...
+        )
+    elseif N1 == N2
+        initial
+    elseif N1 < N2
+        tuple(initial..., AUTO_AXIS_NAMES[N1 + 1:N2]...)
+    else
+        initial[1:N2]
+    end
+end
+
+function generate_axis_names(array::NamedAxisArray, val::Val)
+    generate_axis_names(axisnames(array), val)
+end
+
+@inline Base.getindex(array::NamedAxisArray, index::Int) = getindex(array.data, index)
+function Base.getindex(array::NamedAxisArray, I...)
+    indices = NamedTuple{generate_axis_names(array, Val{length(I)}()), typeof(I)}(I)
+    getindex(array, indices)
+end
+function Base.getindex(array::NamedAxisArray, indices::NamedTuple)
+    fullinds = fullindices(array, indices)
+    newdata = getindex(array.data, values(fullinds)...)
+    _get_index(array, newdata, fullinds)
+end
+
+_get_index(array::NamedAxisArray{T}, newdata::T, ::NamedTuple) where T = newdata
+function _get_index(array::NamedAxisArray, newdata::AbstractArray, indices::NamedTuple)
+    if @generated
+        names = remaining_labels(array, indices)
+        T  = eltype(newdata)
+        :(NamedAxisArray{$T, $(ndims(newdata)), $newdata, $names}(newdata))
+    else
+        NamedAxisArray(newdata, remaining_labels(typeof(array), typeof(indices)))
+    end
+end
+
 
 
 end # module
