@@ -12,6 +12,7 @@ function LabeledArray(data::AbstractArray{T, N1},
                       names::NTuple{N2, Symbol}) where {T, N1, N2}
     LabeledArray{T, N1, typeof(data), generate_axis_names(names, Val{N1}())}(data)
 end
+LabeledArray(data::AbstractArray) = LabeledArray(data, labels(data))
 
 const LabelledArray = LabeledArray # for the brit inside each of us
 
@@ -27,8 +28,10 @@ function Base.size(array::LabeledArray, axis::Symbol)
 end
 Base.getindex(array::LabeledArray; kwargs...) = getindex(array, kwargs.data)
 Base.ndims(array::LabeledArray{T, N}) where {T, N} = N
+""" Labels attached to the axis of an array """
 @inline labels(array::LabeledArray{T, N, A, S}) where {T, N, A, S} = S
 @inline labels(array::Type{LabeledArray{T, N, A, S}}) where {T, N, A, S} = S
+@inline labels(array::AbstractArray) = AUTO_AXIS_NAMES[1:ndims(array)]
 
 abstract type IndexType end
 struct DecayingIndex  <: IndexType end
@@ -54,7 +57,11 @@ function remaining_labels(array::Type{<:AbstractArray}, axes::Type{<:NamedTuple}
            if IndexType(array, t) isa VectorIndex)...)
 end
 
-""" Auto-generated axis name """
+""" Auto-generated axis name.
+
+In practice, each name is paired with a single axis number. E.g. axis 1 will always have the
+same name across a session. However, form one session to the next, the names may change.
+"""
 const AUTO_AXIS_NAMES = let
     names = ("lapin", "rat", "corbeau", "cochon", "saumon", "cafard", "dauphin")
     attributes = ("rose", "noir", "abile", "séché", "salubre", "émue", "sucré")
@@ -90,6 +97,10 @@ function fullindices(array::LabeledArray, indices::NamedTuple)
     end
 end
 
+""" Generate a tuple of labels of length N2
+
+Auto generates name or truncates initial tuple, as required.
+"""
 function generate_axis_names(initial::NTuple{N1, Symbol},
                              ::Val{N2})::NTuple{N2, Symbol} where {N1, N2}
     if @generated
