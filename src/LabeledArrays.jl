@@ -146,13 +146,17 @@ end
 Base.setindex!(array::LabeledArray, v::Any; kwargs...) = setindex!(array, v, kwargs.data)
 Base.setindex!(array::LabeledArray, v::Any, i::Int) = setindex!(array.data, v, i)
 function Base.setindex!(array::LabeledArray, v::Any, indices::NamedTuple)
-    indices = NamedTuple{generate_axis_names(array, Val{length(I)}()), typeof(I)}(I)
-    setindex!(array, indices)
-end
-function Base.setindex!(array::LabeledArray, v::Any, indices::NamedTuple)
     fullinds = fullindices(array, indices)
     setindex!(array.data, v, values(fullinds)...)
 end
 
+function Base.permutedims(array::LabeledArray, axes::Any)
+    names = indexin(axes, collect(labels(array)))
+    autos = indexin(axes, collect(AUTO_AXIS_NAMES))
+    dims = [u === nothing ? (autos[i] === nothing ? axes[i] : autos[i]) : u 
+            for (i, u) in enumerate(names)]
+    data = permutedims(array.data, dims)
+    LabeledArray(data, tuple(collect(labels(array))[dims]...))
+end
 
 end # module

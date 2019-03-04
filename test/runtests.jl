@@ -68,4 +68,12 @@ end
     @test A[foo=2:3, bar=1:3] == B
 end
 
+@testset "permutations" begin
+    A = LabeledArray(rand(-10:10, (3, 4, 2)), (:a, :b, :c))
+    @test permutedims(A, (1, 3, 2)) == permutedims(A, (1, 3, 2))
+    @test permutedims(A, (1, :c, 2)) == permutedims(A, (1, 3, 2))
+    ax = LabeledArrays.AUTO_AXIS_NAMES[2]
+    @test permutedims(A, (1, :c, ax)) == permutedims(A, (1, 3, 2))
+end
+
 end
