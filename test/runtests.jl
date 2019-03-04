@@ -61,4 +61,11 @@ end
 
 end
 
+@testset "setindex!" begin
+    A = LabeledArray(rand(-10:10, (3, 4)), (:foo, :bar))
+    B = rand(-10:10, (2, 3))
+    @inferred setindex!(A, B; foo=2:3, bar=1:3)
+    @test A[foo=2:3, bar=1:3] == B
+end
+
 end

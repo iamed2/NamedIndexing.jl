@@ -26,7 +26,6 @@ function Base.size(array::LabeledArray, axis::Symbol)
     getproperty(NamedTuple{labels(array), NTuple{ndims(array), Int}}(size(array.data)),
                 axis)
 end
-Base.getindex(array::LabeledArray; kwargs...) = getindex(array, kwargs.data)
 Base.ndims(array::LabeledArray{T, N}) where {T, N} = N
 """ Labels attached to the axis of an array """
 @inline labels(array::LabeledArray{T, N, A, S}) where {T, N, A, S} = S
@@ -121,7 +120,8 @@ function generate_axis_names(array::LabeledArray, val::Val)
     generate_axis_names(labels(array), val)
 end
 
-@inline Base.getindex(array::LabeledArray, index::Int) = getindex(array.data, index)
+Base.getindex(array::LabeledArray; kwargs...) = getindex(array, kwargs.data)
+Base.getindex(array::LabeledArray, index::Int) = getindex(array.data, index)
 function Base.getindex(array::LabeledArray, I...)
     indices = NamedTuple{generate_axis_names(array, Val{length(I)}()), typeof(I)}(I)
     getindex(array, indices)
@@ -143,6 +143,16 @@ function _get_index(array::LabeledArray, newdata::AbstractArray, indices::NamedT
     end
 end
 
+Base.setindex!(array::LabeledArray, v::Any; kwargs...) = setindex!(array, v, kwargs.data)
+Base.setindex!(array::LabeledArray, v::Any, i::Int) = setindex!(array.data, v, i)
+function Base.setindex!(array::LabeledArray, v::Any, indices::NamedTuple)
+    indices = NamedTuple{generate_axis_names(array, Val{length(I)}()), typeof(I)}(I)
+    setindex!(array, indices)
+end
+function Base.setindex!(array::LabeledArray, v::Any, indices::NamedTuple)
+    fullinds = fullindices(array, indices)
+    setindex!(array.data, v, values(fullinds)...)
+end
 
 
 end # module
