@@ -52,7 +52,7 @@ end
         @test labels(A[foo=1:2, bear=:]) == (:foo, :bar, :bear)
     end
 
-    @testset "check relabelling" begin
+    @testset "check relabeling" begin
         args = [:bar=>1:2, :foo=>2, LabeledArrays.AUTO_AXIS_NAMES[1]=>:]
         subarray = @inferred getindex(A; args...)
         @test subarray.data == A.data[2, 1:2, :]
@@ -66,6 +66,25 @@ end
     B = rand(-10:10, (2, 3))
     @inferred setindex!(A, B; foo=2:3, bar=1:3)
     @test A[foo=2:3, bar=1:3] == B
+
+    A = LabeledArray(rand(-10:10, (3, 4, 5)), (:a, :b, :c))
+    B = LabeledArray(rand(-10:10, (5, 3, 4)), (:c, :a, :b))
+    A[a=2:3, b=1, c=2:4] = B[a=1:2, b=2, c=1:3]
+    @test A[a=2:3, b=1, c=2:4].data == B[a=1:2, b=2, c=1:3].data'
+
+    A = LabeledArray(rand(-10:10, (3, 4, 5)), (:a, :b, :c))
+    B = LabeledArray(rand(-10:10, (5, 3, 4)), (:c, :a, :b))
+    A[a=2:3, c=2:4] = B[a=1:2, c=1:3]
+    @test A[a=2:3, c=2:4].data == permutedims(B[a=1:2, c=1:3].data, (2, 3, 1))
+
+    A = LabeledArray(rand(-10:10, (3, 4, 5)), (:a, :b, :c))
+    B = LabeledArray(rand(-10:10, (5, 3, 4)), (:c, :a, :b))
+    A[a=2:3, b=:, c=2:4] = B[a=1:2, c=1:3]
+    @test A[a=2:3, c=2:4].data == permutedims(B[a=1:2, b=:, c=1:3].data, (2, 3, 1))
+
+    @test_throws DimensionMismatch A[a=2:3, b=1:2, c=2:4] = B[a=1:2, b=2, c=1:3]
+    @test_throws DimensionMismatch A[a=2:3, b=1, c=2:4] = B[a=1:2, b=2:4, c=1:3]
+    @test_throws DimensionMismatch A[a=2:3, b=1, c=2:4] = B[a=1:2, b=2, c=1:4]
 end
 
 @testset "permutations" begin

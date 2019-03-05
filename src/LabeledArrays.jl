@@ -23,14 +23,23 @@ end
 
 Base.size(array::LabeledArray) = size(array.data)
 function Base.size(array::LabeledArray, axis::Symbol)
-    getproperty(NamedTuple{labels(array), NTuple{ndims(array), Int}}(size(array.data)),
-                axis)
+    s = size(array.data)
+    getproperty(NamedTuple{labels(array), typeof(s)}(s), axis)
 end
 Base.ndims(array::LabeledArray{T, N}) where {T, N} = N
+function Base.axes(array::LabeledArray, axis::Symbol)
+    ax = axes(array.data)
+    getproperty(NamedTuple{labels(array), typeof(ax)}(ax), axis)
+end
+                                                 
 """ Labels attached to the axis of an array """
 @inline labels(array::LabeledArray{T, N, A, S}) where {T, N, A, S} = S
 @inline labels(array::Type{LabeledArray{T, N, A, S}}) where {T, N, A, S} = S
 @inline labels(array::AbstractArray) = AUTO_AXIS_NAMES[1:ndims(array)]
+@inline labels(array::LabeledArray{T, N, A, S}, i::Integer) where {T, N, A, S} = S[i]
+@inline labels(array::Type{LabeledArray{T, N, A, S}}, i::Integer) where {T, N, A, S} = S[i]
+@inline labels(array::AbstractArray, i::Integer) = AUTO_AXIS_NAMES[i]
+@inline labels(i::Integer) = AUTO_AXIS_NAMES[i]
 
 abstract type IndexType end
 struct DecayingIndex  <: IndexType end
@@ -150,8 +159,35 @@ function Base.setindex!(array::LabeledArray, v::Any, indices::NamedTuple)
     setindex!(array.data, v, values(fullinds)...)
 end
 function Base.setindex!(array::LabeledArray, v::LabeledArray, indices::NamedTuple)
-    for is in Iterators.product(pairs(indices)...)
-        setindex(array, getindex(v; is...); is...)
+    lbls = fullindices(array, indices)
+    @boundscheck begin
+        checkbounds(array.data, values(lbls)...)
+        for (axis, index) in pairs(lbls)
+            shared_axis = axis in labels(v)
+            len = index isa Colon ? size(array, axis) : length(index)
+            if (!shared_axis) &&  len != 1
+                msg = "Axis $axis missing from right-hand-side and has length > 1."
+                throw(DimensionMismatch(msg))
+            end
+            if shared_axis && len != size(v, axis)
+                x = NamedTuple{labels(v), typeof(axes(v))}(axes(v))
+                msg = "Axes of right-hand-side, $lbls, and left-hand-side do not match, $x."
+                throw(DimensionMismatch(msg))
+            end
+        end
+        if !issubset(labels(v), keys(lbls))
+            lv = labels(v)
+            msg = "At least on axis of $lv missing from left-hand-side $(keys(lbls))."
+            throw(DimensionMismatch(msg))
+        end
+    end
+    is = indexin(keys(lbls), collect(labels(v)))
+    rhs_names = tuple((labels(v, i) for i in is if i !== nothing)...)
+    rhs_index = (axes(v, i) for i in rhs_names)
+    iters = (v isa Colon ? axes(array, k) : v for (k, v) in pairs(lbls))
+    for (left, right) in zip(Iterators.product(iters...), Iterators.product(rhs_index...))
+        @inbounds value = getindex(v, NamedTuple{rhs_names, typeof(right)}(right))
+        @inbounds setindex!(array, value, left...)
     end
 end
 
