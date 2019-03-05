@@ -149,6 +149,11 @@ function Base.setindex!(array::LabeledArray, v::Any, indices::NamedTuple)
     fullinds = fullindices(array, indices)
     setindex!(array.data, v, values(fullinds)...)
 end
+function Base.setindex!(array::LabeledArray, v::LabeledArray, indices::NamedTuple)
+    for is in Iterators.product(pairs(indices)...)
+        setindex(array, getindex(v; is...); is...)
+    end
+end
 
 function Base.permutedims(array::LabeledArray, axes::Any)
     names = indexin(axes, collect(labels(array)))
