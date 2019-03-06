@@ -8,6 +8,10 @@ struct LabeledArray{T, N, A <: AbstractArray{T, N}, Names} <: AbstractArray{T, N
     data::A
 end
 
+function LabeledArray{Names}(data::AbstractArray{T, N}) where {T, N, Names}
+    names = generate_axis_names(Names, Val{ndims(data)}())
+    LabeledArray{T, N, typeof(data), names}(data)
+end
 function LabeledArray(data::AbstractArray{T, N1},
                       names::NTuple{N2, Symbol}) where {T, N1, N2}
     LabeledArray{T, N1, typeof(data), generate_axis_names(names, Val{N1}())}(data)
@@ -21,17 +25,14 @@ function Base.IndexStyle(array::Type{<: LabeledArray{T, N, A}}) where {T, N, A}
     Base.IndexStyle(A)
 end
 
+""" Original array wrapped by the LabeledArray. """
+Base.parent(array::LabeledArray) = array.data
 Base.size(array::LabeledArray) = size(array.data)
-function Base.size(array::LabeledArray, axis::Symbol)
-    s = size(array.data)
-    getproperty(NamedTuple{labels(array), typeof(s)}(s), axis)
-end
-Base.ndims(array::LabeledArray{T, N}) where {T, N} = N
-function Base.axes(array::LabeledArray, axis::Symbol)
-    ax = axes(array.data)
-    getproperty(NamedTuple{labels(array), typeof(ax)}(ax), axis)
-end
-                                                 
+labeled_size(array::LabeledArray) = NamedTuple{labels(array)}(size(array.data))
+Base.size(a::LabeledArray, axis::Symbol) = getproperty(labeled_size(a), axis)
+labeled_axes(array::LabeledArray) = NamedTuple{labels(array)}(axes(array.data))
+Base.axes(a::LabeledArray, axis::Symbol) = getproperty(labeled_axes(a), axis)
+
 """ Labels attached to the axis of an array """
 @inline labels(array::LabeledArray{T, N, A, S}) where {T, N, A, S} = S
 @inline labels(array::Type{LabeledArray{T, N, A, S}}) where {T, N, A, S} = S
@@ -78,7 +79,7 @@ const AUTO_AXIS_NAMES = let
 end
 
 """ Creates the full set of indices for the array """
-function fullindices(array::LabeledArray, indices::NamedTuple)
+function Base.to_indices(array::LabeledArray, indices::NamedTuple)
     if @generated
         inames = fieldnames(indices)
 
@@ -132,17 +133,37 @@ end
 Base.getindex(array::LabeledArray; kwargs...) = getindex(array, kwargs.data)
 Base.getindex(array::LabeledArray, index::Int) = getindex(array.data, index)
 function Base.getindex(array::LabeledArray, I...)
-    indices = NamedTuple{generate_axis_names(array, Val{length(I)}()), typeof(I)}(I)
+    indices = NamedTuple{generate_axis_names(array, Val{length(I)}())}(I)
     getindex(array, indices)
 end
 function Base.getindex(array::LabeledArray, indices::NamedTuple)
-    fullinds = fullindices(array, indices)
+    fullinds = to_indices(array, indices)
     newdata = getindex(array.data, values(fullinds)...)
     _get_index(array, newdata, fullinds)
 end
-
 _get_index(array::LabeledArray{T}, newdata::T, ::NamedTuple) where T = newdata
 function _get_index(array::LabeledArray, newdata::AbstractArray, indices::NamedTuple)
+    if @generated
+        names = remaining_labels(array, indices)
+        T  = eltype(newdata)
+        :(LabeledArray{$T, $(ndims(newdata)), $newdata, $names}(newdata))
+    else
+        LabeledArray(newdata, remaining_labels(typeof(array), typeof(indices)))
+    end
+end
+
+Base.view(array::LabeledArray; kwargs...) = view(array, kwargs.data)
+Base.view(array::LabeledArray, index::Int) = view(array.data, index)
+function Base.view(array::LabeledArray, I...)
+    indices = NamedTuple{generate_axis_names(array, Val{length(I)}())}(I)
+    view(array, indices)
+end
+function Base.view(array::LabeledArray, indices::NamedTuple)
+    fullinds = to_indices(array, indices)
+    newdata = view(array.data, values(fullinds)...)
+    _view(array, newdata, fullinds)
+end
+function _view(array::LabeledArray, newdata::AbstractArray, indices::NamedTuple)
     if @generated
         names = remaining_labels(array, indices)
         T  = eltype(newdata)
@@ -155,11 +176,11 @@ end
 Base.setindex!(array::LabeledArray, v::Any; kwargs...) = setindex!(array, v, kwargs.data)
 Base.setindex!(array::LabeledArray, v::Any, i::Int) = setindex!(array.data, v, i)
 function Base.setindex!(array::LabeledArray, v::Any, indices::NamedTuple)
-    fullinds = fullindices(array, indices)
+    fullinds = to_indices(array, indices)
     setindex!(array.data, v, values(fullinds)...)
 end
 function Base.setindex!(array::LabeledArray, v::LabeledArray, indices::NamedTuple)
-    lbls = fullindices(array, indices)
+    lbls = to_indices(array, indices)
     @boundscheck begin
         checkbounds(array.data, values(lbls)...)
         for (axis, index) in pairs(lbls)
@@ -194,10 +215,40 @@ end
 function Base.permutedims(array::LabeledArray, axes::Any)
     names = indexin(axes, collect(labels(array)))
     autos = indexin(axes, collect(AUTO_AXIS_NAMES))
-    dims = [u === nothing ? (autos[i] === nothing ? axes[i] : autos[i]) : u 
+    dims = [u === nothing ? (autos[i] === nothing ? axes[i] : autos[i]) : u
             for (i, u) in enumerate(names)]
     data = permutedims(array.data, dims)
     LabeledArray(data, tuple(collect(labels(array))[dims]...))
+end
+
+function Base.similar(array::LabeledArray, 
+                      dims::Union{Integer, AbstractUnitRange}...)
+    similar(array, eltype(array), dims)
+end
+function Base.similar(array::LabeledArray, T::Type,
+                      dims::Union{Integer, AbstractUnitRange}...)
+    similar(array, T, dims)
+end
+function Base.similar(array::LabeledArray, dims::Tuple)
+    similar(array, eltype(array), dims)
+end
+function Base.similar(array::LabeledArray, T::Type, dims::Tuple)
+    LabeledArray{labels(array)}(similar(array.data, T, dims))
+end
+function Base.similar(array::LabeledArray, T::Type, dims::NTuple{N, Int64}) where N
+    LabeledArray{labels(array)}(similar(array.data, T, dims))
+end
+function Base.similar(array::LabeledArray, T::Type, dims::NamedTuple)
+    LabeledArray{keys(dims)}(similar(array.data, T, dims...))
+end
+Base.similar(a::LabeledArray, dims::NamedTuple) = similar(a, eltype(a), dims)
+Base.similar(array::LabeledArray; kwargs...) = similar(array, kwargs.data)
+function Base.similar(array::LabeledArray, ::NamedTuple{(), Tuple{}})
+    similar(array, eltype(array), size(array)...)
+end
+Base.similar(array::LabeledArray, T::Type; kwargs...) = similar(array, T, kwargs.data)
+function Base.similar(a::LabeledArray, T::Type, ::NamedTuple{(), Tuple{}})
+    similar(a, T, size(a))
 end
 
 end # module

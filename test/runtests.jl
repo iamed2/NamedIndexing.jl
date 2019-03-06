@@ -95,4 +95,26 @@ end
     @test permutedims(A, (1, :c, ax)) == permutedims(A, (1, 3, 2))
 end
 
+@testset "view" begin
+    A = LabeledArray(rand(-10:10, (3, 4, 2)), (:a, :b, :c))
+    @test parent(view(A, b=1, a=1:2)) == view(parent(A), 1:2, 1, :)
+    @test labels(view(A, b=1, a=1:2)) == (:a, :c)
+end
+
+end
+
+@testset "similar" begin
+    A = LabeledArray(rand(-10:10, (3, 4, 2)), (:a, :b, :c))
+
+    @test labels(similar(A)) == (:a, :b, :c)
+    @test size(similar(A)) == size(A)
+    @test eltype(similar(A)) == eltype(A)
+
+    @test labels(similar(A, bar=2)) == (:bar,)
+    @test size(similar(A, bar=2)) == (2,)
+    @test eltype(similar(A, bar=2)) == eltype(A)
+
+    @test labels(similar(A, Int8, 2, 3)) == (:a, :b)
+    @test size(similar(A, Int8, 2, 3)) == (2, 3)
+    @test eltype(similar(A, Int8)) === Int8
 end
