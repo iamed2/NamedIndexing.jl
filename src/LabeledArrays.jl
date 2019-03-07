@@ -20,17 +20,18 @@ LabeledArray(data::AbstractArray) = LabeledArray(data, labels(data))
 
 const LabelledArray = LabeledArray # for the brit inside each of us
 
-Base.IndexStyle(array::LabeledArray) = Base.IndexStyle(array.data)
+Base.IndexStyle(array::LabeledArray) = Base.IndexStyle(parent(array))
 function Base.IndexStyle(array::Type{<: LabeledArray{T, N, A}}) where {T, N, A}
     Base.IndexStyle(A)
 end
 
 """ Original array wrapped by the LabeledArray. """
 Base.parent(array::LabeledArray) = array.data
-Base.size(array::LabeledArray) = size(array.data)
-labeled_size(array::LabeledArray) = NamedTuple{labels(array)}(size(array.data))
+Base.parent(::Type{LabeledArray{T, N, A, M}}) where {T, N, A, M} = A
+Base.size(array::LabeledArray) = size(parent(array))
+labeled_size(array::LabeledArray) = NamedTuple{labels(array)}(size(parent(array)))
 Base.size(a::LabeledArray, axis::Symbol) = getproperty(labeled_size(a), axis)
-labeled_axes(array::LabeledArray) = NamedTuple{labels(array)}(axes(array.data))
+labeled_axes(array::LabeledArray) = NamedTuple{labels(array)}(axes(parent(array)))
 Base.axes(a::LabeledArray, axis::Symbol) = getproperty(labeled_axes(a), axis)
 
 """ Labels attached to the axis of an array """
@@ -131,14 +132,16 @@ function generate_axis_names(array::LabeledArray, val::Val)
 end
 
 Base.getindex(array::LabeledArray; kwargs...) = getindex(array, kwargs.data)
-Base.getindex(array::LabeledArray, index::Int) = getindex(array.data, index)
+function Base.getindex(array::LabeledArray, index::Union{Int, CartesianIndex})
+    getindex(parent(array), index)
+end
 function Base.getindex(array::LabeledArray, I...)
     indices = NamedTuple{generate_axis_names(array, Val{length(I)}())}(I)
     getindex(array, indices)
 end
 function Base.getindex(array::LabeledArray, indices::NamedTuple)
     fullinds = to_indices(array, indices)
-    newdata = getindex(array.data, values(fullinds)...)
+    newdata = getindex(parent(array), values(fullinds)...)
     _get_index(array, newdata, fullinds)
 end
 _get_index(array::LabeledArray{T}, newdata::T, ::NamedTuple) where T = newdata
@@ -153,14 +156,14 @@ function _get_index(array::LabeledArray, newdata::AbstractArray, indices::NamedT
 end
 
 Base.view(array::LabeledArray; kwargs...) = view(array, kwargs.data)
-Base.view(array::LabeledArray, index::Int) = view(array.data, index)
+Base.view(array::LabeledArray, index::Int) = view(parent(array), index)
 function Base.view(array::LabeledArray, I...)
     indices = NamedTuple{generate_axis_names(array, Val{length(I)}())}(I)
     view(array, indices)
 end
 function Base.view(array::LabeledArray, indices::NamedTuple)
     fullinds = to_indices(array, indices)
-    newdata = view(array.data, values(fullinds)...)
+    newdata = view(parent(array), values(fullinds)...)
     _view(array, newdata, fullinds)
 end
 function _view(array::LabeledArray, newdata::AbstractArray, indices::NamedTuple)
@@ -174,15 +177,17 @@ function _view(array::LabeledArray, newdata::AbstractArray, indices::NamedTuple)
 end
 
 Base.setindex!(array::LabeledArray, v::Any; kwargs...) = setindex!(array, v, kwargs.data)
-Base.setindex!(array::LabeledArray, v::Any, i::Int) = setindex!(array.data, v, i)
+function Base.setindex!(array::LabeledArray, v::Any, i::Union{Int, CartesianIndex})
+    setindex!(parent(array), v, i)
+end
 function Base.setindex!(array::LabeledArray, v::Any, indices::NamedTuple)
     fullinds = to_indices(array, indices)
-    setindex!(array.data, v, values(fullinds)...)
+    setindex!(parent(array), v, values(fullinds)...)
 end
 function Base.setindex!(array::LabeledArray, v::LabeledArray, indices::NamedTuple)
     lbls = to_indices(array, indices)
     @boundscheck begin
-        checkbounds(array.data, values(lbls)...)
+        checkbounds(parent(array), values(lbls)...)
         for (axis, index) in pairs(lbls)
             shared_axis = axis in labels(v)
             len = index isa Colon ? size(array, axis) : length(index)
@@ -217,7 +222,7 @@ function Base.permutedims(array::LabeledArray, axes::Any)
     autos = indexin(axes, collect(AUTO_AXIS_NAMES))
     dims = [u === nothing ? (autos[i] === nothing ? axes[i] : autos[i]) : u
             for (i, u) in enumerate(names)]
-    data = permutedims(array.data, dims)
+    data = permutedims(parent(array), dims)
     LabeledArray(data, tuple(collect(labels(array))[dims]...))
 end
 
@@ -233,13 +238,13 @@ function Base.similar(array::LabeledArray, dims::Tuple)
     similar(array, eltype(array), dims)
 end
 function Base.similar(array::LabeledArray, T::Type, dims::Tuple)
-    LabeledArray{labels(array)}(similar(array.data, T, dims))
+    LabeledArray{labels(array)}(similar(parent(array), T, dims))
 end
 function Base.similar(array::LabeledArray, T::Type, dims::NTuple{N, Int64}) where N
-    LabeledArray{labels(array)}(similar(array.data, T, dims))
+    LabeledArray{labels(array)}(similar(parent(array), T, dims))
 end
 function Base.similar(array::LabeledArray, T::Type, dims::NamedTuple)
-    LabeledArray{keys(dims)}(similar(array.data, T, dims...))
+    LabeledArray{keys(dims)}(similar(parent(array), T, dims...))
 end
 Base.similar(a::LabeledArray, dims::NamedTuple) = similar(a, eltype(a), dims)
 Base.similar(array::LabeledArray; kwargs...) = similar(array, kwargs.data)
@@ -251,17 +256,76 @@ function Base.similar(a::LabeledArray, T::Type, ::NamedTuple{(), Tuple{}})
     similar(a, T, size(a))
 end
 
-function Base.:+(a::LabeledArray, b::LabeledArray)
-    if labels(a) == labels(b)
-        return LabeledArray{labels(a)}(a.data + b.data)
-    elseif Set(labels(a)) != Set(labels(b))
-        throw(DimensionMismatch("Array labels do not match"))
-    elseif ndims(a) == 2
-        return NamedTuple{labels(a)}(a.data + transpose(b.data))
-    end
-    result = similar(a, promote_type(eltype(a), eltype(b)))
-    for i in eachindex(a)
+for op in (:+, :-)
+    @eval begin
+        function (::typeof($op))(
+                a::LabeledArray{T, N, A, Names},
+                b::LabeledArray{TT, N, AA, Names}) where {T, TT, N, A, AA, Names}
+            LabeledArray{labels(a)}($op(parent(a), parent(b)))
+        end
+        function (::typeof($op))(
+                a::LabeledArray{T, 2, A, M},
+                b::LabeledArray{TT, 2, AA, MM}) where {T, TT, A, AA, M, MM}
+            if Set(labels(a)) != Set(labels(b))
+                throw(DimensionMismatch("Array labels do not match"))
+            end
+            NamedTuple{labels(a)}($op(parent(a), transpose(parent(b))))
+        end
+        function (::typeof($op))(
+                a::LabeledArray{T, N, A, M},
+                b::LabeledArray{TT, N, AA, MM}) where {T, TT, N, A, AA, M, MM}
+            if Set(labels(a)) != Set(labels(b))
+                throw(DimensionMismatch("Array labels do not match"))
+            end
+            result = similar(a, promote_type(eltype(a), eltype(b)))
+            for ic in eachindex(IndexCartesian(), result)
+                result[ic] = $op(a[ic], b[NamedTuple{labels(a)}(ic)])
+            end
+            result
+        end
     end
 end
 
+for (op, final) in [(:isequal, true), (:!=, false)]
+    @eval function (::typeof($op))(a::LabeledArray, b::LabeledArray)
+        Set(labels(a)) != Set(labels(b)) && return !$final
+        if labels(a) == labels(b)
+            return $op(parent(a), parent(b))
+        elseif ndims(a) == ndims(b) == 2
+            return $op(parent(a), transpose(parent(b)))
+        end
+        for ic in eachindex(IndexCartesian(), result)
+            if a[ic] != b[NamedTuple{labels(a)}(ic)]
+                return !$final
+            end
+        end
+        $final
+    end
+end
+
+function Base.isapprox(a::LabeledArray, b::LabeledArray; kwargs...)
+    Set(labels(a)) != Set(labels(b)) && return false
+    if labels(a) == labels(b)
+        return isapprox(parent(a), parent(b); kwargs...)
+    elseif ndims(a) == ndims(b) == 2
+        return isapprox(parent(a), transpose(parent(b)); kwargs...)
+    end
+    for ic in eachindex(IndexCartesian(), result)
+        if !isapprox(a[ic], b[NamedTuple{labels(a)}(ic)], kwargs...)
+            return false
+        end
+    end
+    true
+end
+
+for op in (:*, :/)
+    @eval begin 
+        function (::typeof($op))(scalar::Number, a::LabeledArray)
+            LabeledArray{labels(a)}($op(scalar, parent(a)))
+        end
+        function (::typeof($op))(a::LabeledArray, scalar::Number)
+            LabeledArray{labels(a)}($op(parent(a), scalar))
+        end
+    end
+end
 end # module

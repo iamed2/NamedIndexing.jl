@@ -66,6 +66,7 @@ end
     B = rand(-10:10, (2, 3))
     @inferred setindex!(A, B; foo=2:3, bar=1:3)
     @test A[foo=2:3, bar=1:3] == B
+    @test A[CartesianIndex(1, 2)] == A.data[CartesianIndex(1, 2)]
 
     A = LabeledArray(rand(-10:10, (3, 4, 5)), (:a, :b, :c))
     B = LabeledArray(rand(-10:10, (5, 3, 4)), (:c, :a, :b))
@@ -101,8 +102,6 @@ end
     @test labels(view(A, b=1, a=1:2)) == (:a, :c)
 end
 
-end
-
 @testset "similar" begin
     A = LabeledArray(rand(-10:10, (3, 4, 2)), (:a, :b, :c))
 
@@ -117,4 +116,37 @@ end
     @test labels(similar(A, Int8, 2, 3)) == (:a, :b)
     @test size(similar(A, Int8, 2, 3)) == (2, 3)
     @test eltype(similar(A, Int8)) === Int8
+end
+
+@testset "addition and substraction" begin
+    A = LabeledArray(rand(-10:10, (3, 4, 2)), (:a, :b, :c))
+    B = LabeledArray(rand(-10:10, (3, 4, 2)), (:a, :b, :c))
+    @test labels(A + B) == labels(A)
+    @test (A + B).data == A.data + B.data
+    @test (A + permutedims(B, (:b, :c, :a))).data == A.data + B.data
+    @test labels(A - B) == labels(A)
+    @test (A - B).data == A.data - B.data
+    @test (A - permutedims(B, (:b, :c, :a))).data == A.data - B.data
+end
+
+@testset "equality" begin
+    A = LabeledArray(rand(-10:10, (3, 4, 2)), (:a, :b, :c))
+    B = copy(A)
+    C = LabeledArray{labels(A)}(2A.data)
+    @test A == A
+    @test A == B
+    @test !(A == C)
+    @test !(A != A)
+    @test !(A != B)
+    @test A != C
+end
+
+@testset "scalar multiplcation" begin
+    A = LabeledArray(rand(-10:10, (3, 4, 2)), (:a, :b, :c))
+    @test labels(2A) == labels(A)
+    @test labels(A / 2) == labels(A)
+    @test 2A == 2A.data
+    @test A / 2 ≈ A.data / 2 atol=1e-8
+end
+
 end
