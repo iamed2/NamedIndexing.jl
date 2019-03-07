@@ -251,4 +251,17 @@ function Base.similar(a::LabeledArray, T::Type, ::NamedTuple{(), Tuple{}})
     similar(a, T, size(a))
 end
 
+function Base.:+(a::LabeledArray, b::LabeledArray)
+    if labels(a) == labels(b)
+        return LabeledArray{labels(a)}(a.data + b.data)
+    elseif Set(labels(a)) != Set(labels(b))
+        throw(DimensionMismatch("Array labels do not match"))
+    elseif ndims(a) == 2
+        return NamedTuple{labels(a)}(a.data + transpose(b.data))
+    end
+    result = similar(a, promote_type(eltype(a), eltype(b)))
+    for i in eachindex(a)
+    end
+end
+
 end # module
