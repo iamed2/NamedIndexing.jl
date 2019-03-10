@@ -1,5 +1,4 @@
-module LabeledArrays
-using Random
+module LabeledArrays using Random
 
 export LabeledArray
 export labels
@@ -33,6 +32,9 @@ labeled_size(array::LabeledArray) = NamedTuple{labels(array)}(size(parent(array)
 Base.size(a::LabeledArray, axis::Symbol) = getproperty(labeled_size(a), axis)
 labeled_axes(array::LabeledArray) = NamedTuple{labels(array)}(axes(parent(array)))
 Base.axes(a::LabeledArray, axis::Symbol) = getproperty(labeled_axes(a), axis)
+# Base.axes(a::LabeledArray) = labeled_axes(a)
+# Base.print_array(io::IO, a::LabeledArray) = Base.print_array(io, parent(a))
+# Base.summary(io::IO, a::LabeledArray) = summary(io, a, values(axes(a)))
 
 """ Labels attached to the axis of an array """
 @inline labels(array::LabeledArray{T, N, A, S}) where {T, N, A, S} = S
@@ -255,6 +257,19 @@ Base.similar(array::LabeledArray, T::Type; kwargs...) = similar(array, T, kwargs
 function Base.similar(a::LabeledArray, T::Type, ::NamedTuple{(), Tuple{}})
     similar(a, T, size(a))
 end
+function Base.similar(::Type{LabeledArray{T}}; kwargs...) where T
+    similar(LabeledArray{T}, kwargs.data)
+end
+function Base.similar(::Type{LabeledArray}, T::Type; kwargs...)
+    similar(LabeledArray{T}, kwargs.data)
+end
+function Base.similar(::Type{<: LabeledArray{T}}, dims::NamedTuple) where T
+    LabeledArray{keys(dims)}(similar(Array{T}, values(dims)))
+end
+function Base.similar(::Type{<: LabeledArray{T, N, A}}, dims::NamedTuple) where {T, N, A}
+    LabeledArray{keys(dims)}(similar(A, T, values(dims)))
+end
+
 
 for op in (:+, :-)
     @eval begin
@@ -328,4 +343,52 @@ for op in (:*, :/)
         end
     end
 end
+
+const AxisTuple = Union{NamedTuple, Tuple}
+const NoAxis = Union{NamedTuple{(), Tuple{}}, Tuple{}}
+Base.BroadcastStyle(A::Type{<:LabeledArray}) = Broadcast.ArrayStyle{A}()
+Base.copy(bc::Broadcast.Broadcasted{Broadcast.ArrayStyle{A}}) where A <: LabeledArray = bc
+function Base.Broadcast.instantiate(bc::Broadcast.Broadcasted{Broadcast.ArrayStyle{A}}) where A <: LabeledArray
+    axs = axes(bc)
+    return Broadcast.Broadcasted{Broadcast.ArrayStyle{A}}(bc.f, bc.args, axs)
+end
+Base.similar(bc::Broadcast.Broadcasted{Broadcast.ArrayStyle{A}}, T::Type) where A <: LabeledArray = similar(LabeledArray{T}, axes(bc))
+@inline Base.axes(bc::Broadcast.Broadcasted{Broadcast.ArrayStyle{A}}) where A <: LabeledArray = _axes(bc, bc.axes)
+_labeled_axes(::Broadcast.Broadcasted, axes::AxisTuple) = axes
+@inline function _axes(bc::Broadcast.Broadcasted, ::Nothing)
+    broadcast_shapes(map(_label_axes, Base.Broadcast.cat_nested(bc)))
+end
+_label_axes(array::LabeledArray) = labeled_axes(array)
+_label_axes(array::Any) = axes(array)
+function broadcast_shapes(args)
+    nts = tuple((u for u in args if u isa NamedTuple)...)
+    nt = reduce(combine_axes, nts; init=NamedTuple())
+    i :: Int64 = length(nt)
+    for axs in nts
+        for j in 1:min(i, length(axs))
+            if keys(nt)[j] != keys(axs)[j]
+                i = j - 1
+                break
+            end
+        end
+    end
+    length(nts) == length(args) && return nt
+    ts = Base.Broadcast.broadcast_shape((u for u in args if !(u isa NamedTuple))...)
+    @show ts i
+    if length(ts) > max(i, 1)
+        throw(DimensionMismatch("Cannot reconcile labeled and unlabeled axes"))
+    end
+    NamedTuple{keys(nt)}(Base.Broadcast.broadcast_shape(values(nt), ts))
+end
+combine_axes(left::NamedTuple, ::NamedTuple{(), Tuple{}}) = left
+combine_axes(::NamedTuple{(), Tuple{}}, right::NamedTuple) = right
+function combine_axes(left::NamedTuple, right::NamedTuple)
+    others = setdiff(keys(right), keys(left))
+    NamedTuple{(keys(left)..., others...)}((
+        (Base.Broadcast._bcs1(v, n in propertynames(right) ? getproperty(right, n) : 1)
+         for (n, v) in pairs(left))...,
+        (Base.Broadcast._bcs1(1, getproperty(right, name)) for name in others)...
+    ))
+end
+
 end # module

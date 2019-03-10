@@ -149,4 +149,38 @@ end
     @test A / 2 ≈ A.data / 2 atol=1e-8
 end
 
+@testset "Broadcasting" begin
+    const combine_axes = LabeledArrays.combine_axes
+
+    @testset "unify shapes" begin
+        @test combine_axes((a=2, b=3, c=4), (a=2, b=3, c=4)) == (a=2, b=3, c=4)
+        @test combine_axes((a=2, c=4), (a=2, b=3, c=4)) == (a=2, c=4, b=3)
+        @test combine_axes((a=2, c=4), (a=2, b=3)) == (a=2, c=4, b=3)
+        @test combine_axes((a=2, b=1, c=4), (a=2, b=3, c=1)) == (a=2, b=3, c=4)
+        @test combine_axes((a=2, c=4), NamedTuple()) == (a=2, c=4)
+        @test combine_axes(NamedTuple(), (a=2, c=4)) == (a=2, c=4)
+        @test_throws DimensionMismatch combine_axes((a=2, c=4), (a=2, c=5)) 
+        
+        args = ((a=1, b=2), (c=4, d=3), (d=3, a=2, e=2))
+        @test LabeledArrays.broadcast_shapes(args) == (a=2, b=2, c=4, d=3, e=2)
+
+        args = ((a=1, b=2), (c=4, d=3), (4, ))
+        @test LabeledArrays.broadcast_shapes(args) == (a=4, b=2, c=4, d=3)
+
+        args = ((a=4, b=2), (c=4, d=3), (4, ))
+        @test LabeledArrays.broadcast_shapes(args) == (a=4, b=2, c=4, d=3)
+
+        args = ((a=4, b=2), (c=4, d=3), (4, 2))
+        @test_throws DimensionMismatch LabeledArrays.broadcast_shapes(args)
+
+        args = ((a=4, b=2), (a=4, b=1, c=4, d=3), (4, 2))
+        @test LabeledArrays.broadcast_shapes(args) == (a=4, b=2, c=4, d=3)
+        args = ((a=4, b=2), (a=4, b=1, c=4, d=3), (4, 2, 4))
+        @test LabeledArrays.broadcast_shapes(args) == (a=4, b=2, c=4, d=3)
+        args = ((a=4, b=2), (a=4, c=4, b=1, d=3), (4, 2, 4))
+        @test_throws DimensionMismatch LabeledArrays.broadcast_shapes(args)
+    end
+
+end
+
 end
