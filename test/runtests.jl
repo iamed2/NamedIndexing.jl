@@ -150,7 +150,7 @@ end
 end
 
 @testset "Broadcasting" begin
-    const combine_axes = LabeledArrays.combine_axes
+    combine_axes(a...) = LabeledArrays.combine_axes(a...)
 
     @testset "unify shapes" begin
         @test combine_axes((a=2, b=3, c=4), (a=2, b=3, c=4)) == (a=2, b=3, c=4)
