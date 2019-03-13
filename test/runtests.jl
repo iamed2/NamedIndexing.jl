@@ -141,12 +141,12 @@ end
     @test A != C
 end
 
-@testset "scalar multiplcation" begin
+@testset "scalar multiplication" begin
     A = LabeledArray(rand(-10:10, (3, 4, 2)), (:a, :b, :c))
     @test labels(2A) == labels(A)
     @test labels(A / 2) == labels(A)
     @test 2A == 2A.data
-    @test A / 2 ≈ A.data / 2 atol=1e-8
+    @test (A / 2).data ≈ A.data / 2 atol=1e-8
 end
 
 @testset "Broadcasting" begin
