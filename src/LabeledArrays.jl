@@ -346,14 +346,15 @@ end
 
 const AxisTuple = Union{NamedTuple, Tuple}
 const NoAxis = Union{NamedTuple{(), Tuple{}}, Tuple{}}
+const LBroadcasted = Broadcast.Broadcasted{Broadcast.ArrayStyle{A}} where A <: LabeledArray
 Base.BroadcastStyle(A::Type{<:LabeledArray}) = Broadcast.ArrayStyle{A}()
-Base.copy(bc::Broadcast.Broadcasted{Broadcast.ArrayStyle{A}}) where A <: LabeledArray = bc
-function Base.Broadcast.instantiate(bc::Broadcast.Broadcasted{Broadcast.ArrayStyle{A}}) where A <: LabeledArray
+Base.copy(bc::LBroadcasted) = bc
+function Base.Broadcast.instantiate(bc::LBroadcasted{A}) where A
     axs = axes(bc)
-    return Broadcast.Broadcasted{Broadcast.ArrayStyle{A}}(bc.f, bc.args, axs)
+    return LBroadcasted{A}(bc.f, bc.args, axs)
 end
-Base.similar(bc::Broadcast.Broadcasted{Broadcast.ArrayStyle{A}}, T::Type) where A <: LabeledArray = similar(LabeledArray{T}, axes(bc))
-@inline Base.axes(bc::Broadcast.Broadcasted{Broadcast.ArrayStyle{A}}) where A <: LabeledArray = _axes(bc, bc.axes)
+Base.similar(bc::LBroadcasted) = similar(LabeledArray{T}, axes(bc))
+@inline Base.axes(bc::LBroadcasted) = _axes(bc, bc.axes)
 _labeled_axes(::Broadcast.Broadcasted, axes::AxisTuple) = axes
 @inline function _axes(bc::Broadcast.Broadcasted, ::Nothing)
     broadcast_shapes(map(_label_axes, Base.Broadcast.cat_nested(bc)))
@@ -374,7 +375,6 @@ function broadcast_shapes(args)
     end
     length(nts) == length(args) && return nt
     ts = Base.Broadcast.broadcast_shape((u for u in args if !(u isa NamedTuple))...)
-    @show ts i
     if length(ts) > max(i, 1)
         throw(DimensionMismatch("Cannot reconcile labeled and unlabeled axes"))
     end
