@@ -25,8 +25,8 @@ end
 for func in (:firstindex, :lastindex, :length, :pairs, :keys, :values, :isempty, :iterate)
 	@eval Base.$func(a::LabeledAxes) = $func(a.axs)
 end
-for func in (:(Base.isless), :(Base.isequal), :((::typeof(==))), :(Base.merge))
-	@eval $func(a::LabeledAxes, b::LabeledAxes) = $func(a.axs, b.axs)
-	@eval $func(a::NamedTuple, b::LabeledAxes) = $func(a, b.axs)
-	@eval $func(a::LabeledAxes, b::NamedTuple) = $func(a.axs, b)
+for func in (:isless, :isequal, :merge, :(==))
+	@eval Base.$func(a::LabeledAxes, b::LabeledAxes) = $func(a.axs, b.axs)
+	@eval Base.$func(a::NamedTuple, b::LabeledAxes) = $func(a, b.axs)
+	@eval Base.$func(a::LabeledAxes, b::NamedTuple) = $func(a.axs, b)
 end
