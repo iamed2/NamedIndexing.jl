@@ -9,13 +9,11 @@ Base.similar(bc::LBroadcasted) = similar(LabeledArray{T}, axes(bc))
 @inline Base.axes(bc::LBroadcasted) = _axes(bc, bc.axes)
 _labeled_axes(::Broadcast.Broadcasted, axes::Axes) = axes
 @inline function _axes(bc::Broadcast.Broadcasted, ::Nothing)
-    broadcast_shapes(map(_label_axes, Base.Broadcast.cat_nested(bc)))
+    broadcastshapes(map(axes, Base.Broadcast.cat_nested(bc)))
 end
-_label_axes(array::LabeledArray) = labeled_axes(array)
-_label_axes(array::Any) = axes(array)
-function broadcast_shapes(args)
-    nts = tuple((u for u in args if u isa NamedTuple)...)
-    nt = reduce(combine_axes, nts; init=NamedTuple())
+function broadcastshapes(args)
+    nts = tuple((u for u in args if u isa Axes)...)
+    nt = reduce(combine_axes, nts; init=LabeledAxes())
     i :: Int64 = length(nt)
     for axs in nts
         for j in 1:min(i, length(axs))
@@ -26,17 +24,17 @@ function broadcast_shapes(args)
         end
     end
     length(nts) == length(args) && return nt
-    ts = Base.Broadcast.broadcast_shape((u for u in args if !(u isa NamedTuple))...)
+    ts = Base.Broadcast.broadcast_shape((u for u in args if !(u isa Axes))...)
     if length(ts) > max(i, 1)
         throw(DimensionMismatch("Cannot reconcile labeled and unlabeled axes"))
     end
-    NamedTuple{keys(nt)}(Base.Broadcast.broadcast_shape(values(nt), ts))
+    LabeledAxes{keys(nt)}(Base.Broadcast.broadcast_shape(values(nt), ts))
 end
-combine_axes(left::NamedTuple, ::NamedTuple{(), Tuple{}}) = left
-combine_axes(::NamedTuple{(), Tuple{}}, right::NamedTuple) = right
-function combine_axes(left::NamedTuple, right::NamedTuple)
+combine_axes(left::Axes, ::NoAxes) = left
+combine_axes(::NoAxes, right::Axes) = right
+function combine_axes(left::Axes, right::Axes)
     others = setdiff(keys(right), keys(left))
-    NamedTuple{(keys(left)..., others...)}((
+    LabeledAxes{(keys(left)..., others...)}((
         (Base.Broadcast._bcs1(v, n in propertynames(right) ? getproperty(right, n) : 1)
          for (n, v) in pairs(left))...,
         (Base.Broadcast._bcs1(1, getproperty(right, name)) for name in others)...

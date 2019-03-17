@@ -40,14 +40,16 @@ function Base.haskey(nt::LabeledAxes, key::Union{Integer, Symbol})
 end
 Base.iterate(t::LabeledAxes, iter) = iterate(parent(t), iter)
 Base.getproperty(t::LabeledAxes, s::Symbol) = getfield(parent(t), s)
-function Base.map(f, nt::LabeledAxes{name},
-                  nts::Union{LabeledAxes, NamedTuple}...) where name
-	map(f∘NamedTuple, nt, nts...)
+@inline unlabel(ax::LabeledAxes) = parent(ax)
+@inline unlabel(ax) = ax
+function Base.map(f::Function, nt::LabeledAxes{name}, nts::Axes...) where name
+    map(f∘unlabel, unlabel(nt), nts...)
 end
 for func in (:firstindex, :lastindex, :length, :pairs,
              :keys, :values, :isempty, :iterate)
 	@eval Base.$func(a::LabeledAxes) = $func(parent(a))
 end
+Base.tail(a::LabeledAxes) = LabeledAxes(Base.tail(parent(a)))
 for f in (:isless, :isequal, :merge, :(==))
 	@eval begin
         Base.$f(a::LabeledAxes, b::LabeledAxes) = $f(parent(a), parent(b))
