@@ -24,16 +24,16 @@ end
 function Base.similar(array::LabeledArray, T::Type, dims::NTuple{N, Int64}) where N
     LabeledArray{labels(array)}(similar(parent(array), T, dims))
 end
-function Base.similar(array::LabeledArray, T::Type, dims::NamedTuple)
+function Base.similar(array::LabeledArray, T::Type, dims::Axes)
     LabeledArray{keys(dims)}(similar(parent(array), T, dims...))
 end
-Base.similar(a::LabeledArray, dims::NamedTuple) = similar(a, eltype(a), dims)
+Base.similar(a::LabeledArray, dims::Axes) = similar(a, eltype(a), dims)
 Base.similar(array::LabeledArray; kwargs...) = similar(array, kwargs.data)
-function Base.similar(array::LabeledArray, ::NamedTuple{(), Tuple{}})
+function Base.similar(array::LabeledArray, ::NoAxes)
     similar(array, eltype(array), size(array)...)
 end
 Base.similar(array::LabeledArray, T::Type; kwargs...) = similar(array, T, kwargs.data)
-function Base.similar(a::LabeledArray, T::Type, ::NamedTuple{(), Tuple{}})
+function Base.similar(a::LabeledArray, T::Type, ::NoAxes)
     similar(a, T, size(a))
 end
 function Base.similar(::Type{LabeledArray{T}}; kwargs...) where T
@@ -42,10 +42,10 @@ end
 function Base.similar(::Type{LabeledArray}, T::Type; kwargs...)
     similar(LabeledArray{T}, kwargs.data)
 end
-function Base.similar(::Type{<: LabeledArray{T}}, dims::NamedTuple) where T
+function Base.similar(::Type{<: LabeledArray{T}}, dims::Axes) where T
     LabeledArray{keys(dims)}(similar(Array{T}, values(dims)))
 end
-function Base.similar(::Type{<: LabeledArray{T, N, A}}, dims::NamedTuple) where {T, N, A}
+function Base.similar(::Type{<: LabeledArray{T, N, A}}, dims::Axes) where {T, N, A}
     LabeledArray{keys(dims)}(similar(A, T, values(dims)))
 end
 
@@ -63,7 +63,7 @@ for op in (:+, :-)
             if Set(labels(a)) != Set(labels(b))
                 throw(DimensionMismatch("Array labels do not match"))
             end
-            NamedTuple{labels(a)}($op(parent(a), transpose(parent(b))))
+            LabeledArray{labels(a)}($op(parent(a), transpose(parent(b))))
         end
         function (::typeof($op))(
                 a::LabeledArray{T, N, A, M},
@@ -81,19 +81,21 @@ for op in (:+, :-)
 end
 
 for (op, final) in [(:isequal, true), (:!=, false)]
-    @eval function (::typeof($op))(a::LabeledArray, b::LabeledArray)
-        Set(labels(a)) != Set(labels(b)) && return !$final
-        if labels(a) == labels(b)
-            return $op(parent(a), parent(b))
-        elseif ndims(a) == ndims(b) == 2
-            return $op(parent(a), transpose(parent(b)))
-        end
-        for ic in eachindex(IndexCartesian(), result)
-            if a[ic] != b[NamedTuple{labels(a)}(ic)]
-                return !$final
+    @eval begin
+        function (::typeof($op))(a::LabeledArray, b::LabeledArray)
+            Set(labels(a)) != Set(labels(b)) && return !$final
+            if labels(a) == labels(b)
+                return $op(parent(a), parent(b))
+            elseif ndims(a) == ndims(b) == 2
+                return $op(parent(a), transpose(parent(b)))
             end
+            for ic in eachindex(IndexCartesian(), result)
+                if a[ic] != b[NamedTuple{labels(a)}(ic)]
+                    return !$final
+                end
+            end
+            $final
         end
-        $final
     end
 end
 

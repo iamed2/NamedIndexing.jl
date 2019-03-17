@@ -1,5 +1,3 @@
-const Axis = Union{NamedTuple, Tuple}
-const NoAxis = Union{NamedTuple{(), Tuple{}}, Tuple{}}
 const LBroadcasted = Broadcast.Broadcasted{Broadcast.ArrayStyle{A}} where A <: LabeledArray
 Base.BroadcastStyle(A::Type{<:LabeledArray}) = Broadcast.ArrayStyle{A}()
 Base.copy(bc::LBroadcasted) = bc
@@ -9,7 +7,7 @@ function Base.Broadcast.instantiate(bc::LBroadcasted{A}) where A
 end
 Base.similar(bc::LBroadcasted) = similar(LabeledArray{T}, axes(bc))
 @inline Base.axes(bc::LBroadcasted) = _axes(bc, bc.axes)
-_labeled_axes(::Broadcast.Broadcasted, axes::Axis) = axes
+_labeled_axes(::Broadcast.Broadcasted, axes::Axes) = axes
 @inline function _axes(bc::Broadcast.Broadcasted, ::Nothing)
     broadcast_shapes(map(_label_axes, Base.Broadcast.cat_nested(bc)))
 end

@@ -70,7 +70,7 @@ end
 
     A = LabeledArray(rand(-10:10, (3, 4, 5)), (:a, :b, :c))
     B = LabeledArray(rand(-10:10, (5, 3, 4)), (:c, :a, :b))
-    A[a=2:3, b=1, c=2:4] = B[a=1:2, b=2, c=1:3]
+    @inferred setindex!(A, B[a=1:2, b=2, c=1:3]; a=2:3, b=1, c=2:4)
     @test A[a=2:3, b=1, c=2:4].data == B[a=1:2, b=2, c=1:3].data'
 
     A = LabeledArray(rand(-10:10, (3, 4, 5)), (:a, :b, :c))

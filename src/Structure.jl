@@ -22,14 +22,18 @@ end
 """ Original array wrapped by the LabeledArray. """
 Base.parent(array::LabeledArray) = array.data
 Base.parent(::Type{LabeledArray{T, N, A, M}}) where {T, N, A, M} = A
-Base.size(array::LabeledArray) = size(parent(array))
-labeled_size(array::LabeledArray) = NamedTuple{labels(array)}(size(parent(array)))
-Base.size(a::LabeledArray, axis::Symbol) = getproperty(labeled_size(a), axis)
-labeled_axes(array::LabeledArray) = NamedTuple{labels(array)}(axes(parent(array)))
-Base.axes(a::LabeledArray, axis::Symbol) = getproperty(labeled_axes(a), axis)
-# Base.axes(a::LabeledArray) = labeled_axes(a)
-# Base.print_array(io::IO, a::LabeledArray) = Base.print_array(io, parent(a))
-# Base.summary(io::IO, a::LabeledArray) = summary(io, a, values(axes(a)))
+Base.size(array::LabeledArray) = LabeledAxes{labels(array)}(size(parent(array)))
+Base.size(a::LabeledArray, axis::Symbol) = getproperty(size(a), axis)
+Base.axes(array::LabeledArray) = LabeledAxes{labels(array)}(axes(parent(array)))
+Base.axes(array::LabeledArray, c::Symbol) = getproperty(axes(array), c)
+Base.print_array(io::IO, a::LabeledArray) = Base.print_array(io, parent(a))
+Base.summary(io::IO, a::LabeledArray) = summary(io, a, values(axes(a)))
+Base.LinearIndices(a::LabeledArrays.LabeledAxes) = LinearIndices(values(a))
+Base.CartesianIndices(a::LabeledArrays.LabeledAxes) = CartesianIndices(values(a))
+function Base.checkbounds(::Type{Bool}, A::LabeledArray, I...)
+    Base.@_inline_meta
+    Base.checkbounds_indices(Bool, values(axes(A)), I)
+end
 
 """ Labels attached to the axis of an array """
 @inline labels(array::LabeledArray{T, N, A, S}) where {T, N, A, S} = S
@@ -136,19 +140,22 @@ function Base.getindex(array::LabeledArray, I...)
     indices = NamedTuple{generate_axis_names(array, Val{length(I)}())}(I)
     getindex(array, indices)
 end
-function Base.getindex(array::LabeledArray, indices::NamedTuple)
+function Base.getindex(array::LabeledArray, indices::Axes)
     fullinds = to_indices(array, indices)
     newdata = getindex(parent(array), values(fullinds)...)
     _get_index(array, newdata, fullinds)
 end
-_get_index(array::LabeledArray{T}, newdata::T, ::NamedTuple) where T = newdata
-function _get_index(array::LabeledArray, newdata::AbstractArray, indices::NamedTuple)
+_get_index(array::LabeledArray{T}, newdata::T, ::Axes) where T = newdata
+function _get_index(array::LabeledArray, data::AbstractArray, inds::LabeledAxes)
+    _get_index(array, data, parent(inds))
+end
+function _get_index(array::LabeledArray, data::AbstractArray, inds::NamedTuple)
     if @generated
-        names = remaining_labels(array, indices)
-        T  = eltype(newdata)
-        :(LabeledArray{$T, $(ndims(newdata)), $newdata, $names}(newdata))
+        names = remaining_labels(array, inds)
+        T  = eltype(data)
+        :(LabeledArray{$T, $(ndims(data)), $data, $names}(data))
     else
-        LabeledArray(newdata, remaining_labels(typeof(array), typeof(indices)))
+        LabeledArray(data, remaining_labels(typeof(array), typeof(inds)))
     end
 end
 
@@ -193,7 +200,7 @@ function Base.setindex!(array::LabeledArray, v::LabeledArray, indices::NamedTupl
                 throw(DimensionMismatch(msg))
             end
             if shared_axis && len != size(v, axis)
-                x = NamedTuple{labels(v), typeof(axes(v))}(axes(v))
+                x = axes(v)
                 msg = "Axes of right-hand-side, $lbls, and left-hand-side do not match, $x."
                 throw(DimensionMismatch(msg))
             end
@@ -209,7 +216,7 @@ function Base.setindex!(array::LabeledArray, v::LabeledArray, indices::NamedTupl
     rhs_index = (axes(v, i) for i in rhs_names)
     iters = (v isa Colon ? axes(array, k) : v for (k, v) in pairs(lbls))
     for (left, right) in zip(Iterators.product(iters...), Iterators.product(rhs_index...))
-        @inbounds value = getindex(v, NamedTuple{rhs_names, typeof(right)}(right))
-        @inbounds setindex!(array, value, left...)
+        @inbounds value = getindex(v, NamedTuple{rhs_names}(right))
+        @inbounds setindex!(parent(array), value, left...)
     end
 end
