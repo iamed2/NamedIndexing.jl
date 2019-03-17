@@ -81,6 +81,7 @@ const AUTO_AXIS_NAMES = let
 end
 
 """ Creates the full set of indices for the array """
+Base.to_indices(a::LabeledArray, inds::LabeledArray) = to_indices(array, parent(inds))
 function Base.to_indices(array::LabeledArray, indices::NamedTuple)
     if @generated
         inames = fieldnames(indices)
@@ -146,9 +147,6 @@ function Base.getindex(array::LabeledArray, indices::Axes)
     _get_index(array, newdata, fullinds)
 end
 _get_index(array::LabeledArray{T}, newdata::T, ::Axes) where T = newdata
-function _get_index(array::LabeledArray, data::AbstractArray, inds::LabeledAxes)
-    _get_index(array, data, parent(inds))
-end
 function _get_index(array::LabeledArray, data::AbstractArray, inds::NamedTuple)
     if @generated
         names = remaining_labels(array, inds)
@@ -165,7 +163,7 @@ function Base.view(array::LabeledArray, I...)
     indices = NamedTuple{generate_axis_names(array, Val{length(I)}())}(I)
     view(array, indices)
 end
-function Base.view(array::LabeledArray, indices::NamedTuple)
+function Base.view(array::LabeledArray, indices::Axes)
     fullinds = to_indices(array, indices)
     newdata = view(parent(array), values(fullinds)...)
     _view(array, newdata, fullinds)
@@ -184,11 +182,11 @@ Base.setindex!(array::LabeledArray, v::Any; kwargs...) = setindex!(array, v, kwa
 function Base.setindex!(array::LabeledArray, v::Any, i::Union{Int, CartesianIndex})
     setindex!(parent(array), v, i)
 end
-function Base.setindex!(array::LabeledArray, v::Any, indices::NamedTuple)
+function Base.setindex!(array::LabeledArray, v::Any, indices::Axes)
     fullinds = to_indices(array, indices)
     setindex!(parent(array), v, values(fullinds)...)
 end
-function Base.setindex!(array::LabeledArray, v::LabeledArray, indices::NamedTuple)
+function Base.setindex!(array::LabeledArray, v::LabeledArray, indices::Axes)
     lbls = to_indices(array, indices)
     @boundscheck begin
         checkbounds(parent(array), values(lbls)...)

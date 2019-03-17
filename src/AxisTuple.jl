@@ -10,6 +10,7 @@ const NoAxes = Union{NamedTuple{(), Tuple{}},
 
 LabeledAxes(; kwargs...) = LabeledAxes(kwargs.data)
 @inline Base.parent(axs::LabeledAxes) = getfield(axs, :axs)
+@inline Base.parent(::Type{LabeledAxes{N, T}}) where {N, T} = NamedTuple{N, T}
 NamedTuple(nt::LabeledAxes) = parent(nt)
 LabeledAxes{Names}(t::Tuple) where Names = LabeledAxes(NamedTuple{Names}(t))
 Base.summary(io::IO, axs::LabeledAxes) = write(io, "LabeledAxes")
