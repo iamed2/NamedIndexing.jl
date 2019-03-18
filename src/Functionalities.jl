@@ -1,3 +1,4 @@
+Base.dataids(a::LabeledArray) = dataids(parent(a))
 function Base.permutedims(array::LabeledArray, axes::Any)
     names = indexin(axes, collect(labels(array)))
     autos = indexin(axes, collect(AUTO_AXIS_NAMES))

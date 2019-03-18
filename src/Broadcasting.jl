@@ -7,7 +7,7 @@ function Base.Broadcast.instantiate(bc::LBroadcasted{A}) where A
 end
 Base.similar(bc::LBroadcasted) = similar(LabeledArray{T}, axes(bc))
 @inline Base.axes(bc::LBroadcasted) = _axes(bc, bc.axes)
-_labeled_axes(::Broadcast.Broadcasted, axes::Axes) = axes
+_axes(::Broadcast.Broadcasted, axes::Axes) = axes
 @inline function _axes(bc::Broadcast.Broadcasted, ::Nothing)
     broadcastshapes(map(axes, Base.Broadcast.cat_nested(bc)))
 end

@@ -1,7 +1,7 @@
 """ Wraps a named tuple to avoid type piracy """
 
-struct LabeledAxes{Names, Ts}
-    axs::NamedTuple{Names, Ts}
+struct LabeledAxes{Labels, Ts}
+    axs::NamedTuple{Labels, Ts}
 end
 const Axes{N, T} = Union{NamedTuple{N, T}, LabeledAxes{N, T}} where {N, T}
 const NoAxes = Union{NamedTuple{(), Tuple{}},
@@ -12,21 +12,21 @@ LabeledAxes(; kwargs...) = LabeledAxes(kwargs.data)
 @inline Base.parent(axs::LabeledAxes) = getfield(axs, :axs)
 @inline Base.parent(::Type{LabeledAxes{N, T}}) where {N, T} = NamedTuple{N, T}
 NamedTuple(nt::LabeledAxes) = parent(nt)
-LabeledAxes{Names}(t::Tuple) where Names = LabeledAxes(NamedTuple{Names}(t))
+LabeledAxes{Labels}(t::Tuple) where Labels = LabeledAxes(NamedTuple{Labels}(t))
 Base.summary(io::IO, axs::LabeledAxes) = write(io, "LabeledAxes")
 Base.show(io::IO, axs::LabeledAxes) = (summary(io, axs); show(io, parent(axs)))
 Base.getindex(axs::LabeledAxes, i::Integer) = parent(axs)[i]
-function Base.convert(::Type{LabeledAxes{names,T}},
-                      nt::LabeledAxes{names,T}) where {names,T<:Tuple} 
+function Base.convert(::Type{LabeledAxes{Labels, T}},
+                      nt::LabeledAxes{Labels, T}) where {Labels, T<:Tuple} 
     nt
 end
-function Base.convert(::Type{LabeledAxes{names}},
-                      nt::LabeledAxes{names}) where {names}
+function Base.convert(::Type{LabeledAxes{Labels}},
+                      nt::LabeledAxes{Labels}) where {Labels}
     nt
 end
-function Base.convert(::Type{LabeledAxes{names,T}},
-                      nt::LabeledAxes{names}) where {names,T<:Tuple}
-   LabeledAxes{names,T}(NamedTuple{names, T}(nt))
+function Base.convert(::Type{LabeledAxes{Labels,T}},
+                      nt::LabeledAxes{Labels}) where {Labels,T<:Tuple}
+   LabeledAxes{Labels,T}(NamedTuple{Labels, T}(nt))
 end
 function Base.get(nt::LabeledAxes, key::Union{Integer, Symbol}, default)
     get(parent(nt), key, default)
