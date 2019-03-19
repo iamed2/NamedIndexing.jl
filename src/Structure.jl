@@ -15,9 +15,7 @@ LabeledArray(data::AbstractArray) = LabeledArray(data, labels(data))
 const LabelledArray = LabeledArray # for the brit inside each of us
 
 Base.IndexStyle(array::LabeledArray) = Base.IndexStyle(parent(array))
-function Base.IndexStyle(array::Type{<: LabeledArray{T, N, A}}) where {T, N, A}
-    Base.IndexStyle(A)
-end
+Base.IndexStyle(array::Type{<: LabeledArray}) = Base.IndexStyle(parent(array))
 
 """ Original array wrapped by the LabeledArray. """
 Base.parent(array::LabeledArray) = array.data

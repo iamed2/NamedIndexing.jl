@@ -1,5 +1,6 @@
 const LabeledCartesianIndex{Lbls, N} = LabeledAxes{Lbls, NTuple{N, Int64}} where {Lbls, N}
 const LCI = LabeledCartesianIndex
+
 struct LabeledCartesianIndices{Labels, N, R} <: AbstractArray{LCI{Labels, N}, N}
     inds::CartesianIndices{N, R}
 end
@@ -35,9 +36,25 @@ labels(::LCIs{Labels}) where Labels = Labels
 labels(::Type{<: LCIs{Labels}}) where Labels = Labels
 Base.size(lcis::LCIs) = LabeledAxes{labels(lcis)}(size(parent(lcis)))
 Base.length(lcis::LCIs) = length(parent(lcis))
-Base.@propagate_inbounds function Base.getindex(lcis::LCIs, indx)
+Base.@propagate_inbounds function Base.getindex(lcis::LCIs, indx::Integer)
     LCI{labels(lcis)}(Tuple(getindex(parent(lcis), indx)))
 end
-Base.@propagate_inbounds function Base.getindex(lcis::LCIs, i0, indx...)
-    LCI{labels(lcis)}(Tuple(getindex(parent(lcis), i0, indx...)))
+Base.@propagate_inbounds function Base.getindex(lcis::LCIs, indx...)
+    LCI{labels(lcis)}(Tuple(getindex(parent(lcis), indx...)))
+end
+
+""" Cartesian indexing scheme where each dimension is labeled by name rather than number."""
+struct IndexLabeledCartesian <: IndexStyle end
+function Base.IndexStyle(::IndexLabeledCartesian, ::IndexLabeledCartesian)
+    IndexLabeledCartesian()
+end
+for Indexing in (:IndexCartesian, :IndexLinear)
+    @eval begin
+        function Base.IndexStyle(::$Indexing, ::IndexLabeledCartesian)
+            IndexLabeledCartesian()
+        end
+        function Base.IndexStyle(::IndexLabeledCartesian, ::$Indexing)
+            IndexLabeledCartesian()
+        end
+    end
 end

@@ -162,23 +162,23 @@ end
         @test_throws DimensionMismatch combine_axes((a=2, c=4), (a=2, c=5)) 
         
         args = ((a=1, b=2), (c=4, d=3), (d=3, a=2, e=2))
-        @test LabeledArrays.broadcast_shapes(args) == (a=2, b=2, c=4, d=3, e=2)
+        @test LabeledArrays.broadcastshapes(args) == (a=2, b=2, c=4, d=3, e=2)
 
         args = ((a=1, b=2), (c=4, d=3), (4, ))
-        @test LabeledArrays.broadcast_shapes(args) == (a=4, b=2, c=4, d=3)
+        @test LabeledArrays.broadcastshapes(args) == (a=4, b=2, c=4, d=3)
 
         args = ((a=4, b=2), (c=4, d=3), (4, ))
-        @test LabeledArrays.broadcast_shapes(args) == (a=4, b=2, c=4, d=3)
+        @test LabeledArrays.broadcastshapes(args) == (a=4, b=2, c=4, d=3)
 
         args = ((a=4, b=2), (c=4, d=3), (4, 2))
-        @test_throws DimensionMismatch LabeledArrays.broadcast_shapes(args)
+        @test_throws DimensionMismatch LabeledArrays.broadcastshapes(args)
 
         args = ((a=4, b=2), (a=4, b=1, c=4, d=3), (4, 2))
-        @test LabeledArrays.broadcast_shapes(args) == (a=4, b=2, c=4, d=3)
+        @test LabeledArrays.broadcastshapes(args) == (a=4, b=2, c=4, d=3)
         args = ((a=4, b=2), (a=4, b=1, c=4, d=3), (4, 2, 4))
-        @test LabeledArrays.broadcast_shapes(args) == (a=4, b=2, c=4, d=3)
+        @test LabeledArrays.broadcastshapes(args) == (a=4, b=2, c=4, d=3)
         args = ((a=4, b=2), (a=4, c=4, b=1, d=3), (4, 2, 4))
-        @test_throws DimensionMismatch LabeledArrays.broadcast_shapes(args)
+        @test_throws DimensionMismatch LabeledArrays.broadcastshapes(args)
     end
 
 end
