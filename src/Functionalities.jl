@@ -125,3 +125,8 @@ for op in (:*, :/)
         end
     end
 end
+
+Base.eachindex(::IndexLabeledCartesian, A::AbstractArray) = CartesianIndices(axes(A))
+Base.eachindex(::IndexLabeledCartesian, A::LabeledArray) = LabeledCartesianIndices(axes(A))
+
+unlabel(array::LabeledArray) = parent(array)
