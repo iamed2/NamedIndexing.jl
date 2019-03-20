@@ -17,6 +17,8 @@ end
 function LabeledCartesianIndices{Labels}(x::Tuple) where Labels
     LabeledCartesianIndices{Labels}(CartesianIndices(x))
 end
+LabeledCartesianIndices(x::LabeledAxes) = LabeledCartesianIndices{labels(x)}(values(x))
+LabeledCartesianIndices(x::NamedTuple) = LabeledCartesianIndices{keys(x)}(Tuple(x))
 
 Base.parent(lcis::LCIs) = getfield(lcis, :inds)
 @inline Base.iterate(iter::LCIs) = _iterate(iterate(parent(iter)))
@@ -28,6 +30,8 @@ labels(::LCIs{Labels}) where Labels = Labels
 labels(::Type{<: LCIs{Labels}}) where Labels = Labels
 Base.size(lcis::LCIs) = LabeledAxes{labels(lcis)}(size(parent(lcis)))
 Base.length(lcis::LCIs) = length(parent(lcis))
+Base.ndims(lcis::LCIs) = ndims(parent(lcis))
+Base.axes(lcis::LCIs) = LabeledAxes{labels(lcis)}(axes(parent(lcis)))
 Base.@propagate_inbounds function Base.getindex(lcis::LCIs, indx::Integer)
     LCI{labels(lcis)}(Tuple(getindex(parent(lcis), indx)))
 end
