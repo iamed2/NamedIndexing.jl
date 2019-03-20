@@ -7,13 +7,6 @@ end
 const LCIs = LabeledCartesianIndices
 
 LabeledCartesianIndex{Labels}(x::Tuple) where Labels = LabeledAxes{Labels}(x)
-function Base.summary(io::IO, lcis::LabeledCartesianIndices)
-    write(io, "LabeledCarteasianIndices{$(labels(lcis))}")
-end
-function Base.show(io::IO, lcis::LabeledCartesianIndices) 
-    summary(io, lcis)
-    show(io, parent(lcis))
-end
 
 function LabeledCartesianIndices{Labels}(x) where Labels
     LabeledCartesianIndices{Labels}(CartesianIndices(x))
@@ -21,7 +14,6 @@ end
 function LabeledCartesianIndices{Labels}(x::CartesianIndices{N, R}) where {Labels, N, R}
     LabeledCartesianIndices{Labels, N, R}(x)
 end
-
 function LabeledCartesianIndices{Labels}(x::Tuple) where Labels
     LabeledCartesianIndices{Labels}(CartesianIndices(x))
 end
@@ -57,4 +49,20 @@ for Indexing in (:IndexCartesian, :IndexLinear)
             IndexLabeledCartesian()
         end
     end
+end
+Base.IndexStyle(::Type{<: LCIs}) = IndexLabeledCartesian()
+Base.@propagate_inbounds function Base.to_indices(lcis::LCIs,
+                                                  I::Tuple{Any, Vararg{Any}})
+    Base.to_indices(parent(lcis), I)
+end
+function Base.checkbounds_indices(::Type{Bool}, lcis::LCIs, I)
+    Base.checkbounds_indices(Bool, parent(lcis), I)
+end
+
+unlabel(inds::LabeledCartesianIndices) = parent(inds)
+
+function Base.SubArray(::IndexLabeledCartesian,
+                       parent::P, indices::I, nt::NTuple{N,Any}) where {P,I,N}
+    Base.@_inline_meta
+    Base.SubArray(IndexCartesian(), parent, indices, nt)
 end

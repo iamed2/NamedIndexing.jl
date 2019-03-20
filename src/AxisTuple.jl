@@ -13,7 +13,24 @@ LabeledAxes(; kwargs...) = LabeledAxes(kwargs.data)
 @inline Base.parent(::Type{LabeledAxes{N, T}}) where {N, T} = NamedTuple{N, T}
 NamedTuple(nt::LabeledAxes) = parent(nt)
 LabeledAxes{Labels}(t::Tuple) where Labels = LabeledAxes(NamedTuple{Labels}(t))
-Base.summary(io::IO, axs::LabeledAxes) = write(io, "LabeledAxes")
+labels(::LabeledAxes{Labels}) where Labels = Labels
+labels(::Type{<: LabeledAxes{Labels}}) where Labels = Labels
+function dims2string(inds::NamedTuple)
+    if length(inds) < 0
+        return "0-dimensional"
+    elseif length(inds) == 1
+        return "$(keys(inds)[1])=$(values(inds)[1])"
+    end
+    return join(map(x -> "($(x[1])=$(x[2]))", zip(keys(inds), values(inds))), '×')
+end
+function Base.summary(io::IO, inds::LabeledAxes)
+    write(io, "LabeledAxes")
+end
+function Base.summary(io::IO, a, inds::LabeledAxes{Lbls, T}) where {
+              Lbls, T <: Tuple{Vararg{Base.OneTo}}}
+    print(io, dims2string(NamedTuple{Lbls}(length.(inds))), " ")
+    Base.showarg(io, a, true)
+end
 Base.show(io::IO, axs::LabeledAxes) = (summary(io, axs); show(io, parent(axs)))
 Base.getindex(axs::LabeledAxes, i::Integer) = parent(axs)[i]
 function Base.convert(::Type{LabeledAxes{Labels, T}},
@@ -42,14 +59,18 @@ Base.iterate(t::LabeledAxes, iter) = iterate(parent(t), iter)
 Base.getproperty(t::LabeledAxes, s::Symbol) = getfield(parent(t), s)
 @inline unlabel(ax::LabeledAxes) = parent(ax)
 @inline unlabel(ax) = ax
+
 function Base.map(f::Function, nt::LabeledAxes{name}, nts::Axes...) where name
     map(f∘unlabel, unlabel(nt), nts...)
 end
+
 for func in (:firstindex, :lastindex, :length, :pairs,
              :keys, :values, :isempty, :iterate)
 	@eval Base.$func(a::LabeledAxes) = $func(parent(a))
 end
+
 Base.tail(a::LabeledAxes) = LabeledAxes(Base.tail(parent(a)))
+
 for f in (:isless, :isequal, :merge, :(==))
 	@eval begin
         Base.$f(a::LabeledAxes, b::LabeledAxes) = $f(parent(a), parent(b))
@@ -58,4 +79,8 @@ for f in (:isless, :isequal, :merge, :(==))
 	    Base.$f(a::Tuple, b::LabeledAxes) = $f(a, values(b))
 	    Base.$f(a::LabeledAxes, b::Tuple) = $f(values(a), b)
     end
+end
+
+function Base.checkbounds_indices(::Type{Bool}, ax::LabeledAxes, I)
+    Base.checkbounds_indices(Bool, values(ax), I)
 end
