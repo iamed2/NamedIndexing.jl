@@ -89,44 +89,46 @@ function Base.checkbounds_indices(::Type{Bool}, ax::LabeledAxes, I)
     Base.checkbounds_indices(Bool, values(ax), I)
 end
 
-function _checkbounds_indices(::Type{Bool}, ax::LabeledAxes, inds::Axes)
+function Base.checkbounds_indices(::Type{Bool}, ax::LabeledAxes, inds::Axes)
     for (key, value) in pairs(ax)
         i = auto_axis_index(key)
         if i !== nothing
-            if i < length(inds)
-               if Base.checkindex(Bool, value, inds[i]) == false
-                en
-            end
-            return false
+            right = i <= lengths(inds) ? inds[i] : 1
+            Base.checkindex(Bool, value, right) == false && return false
         elseif haskey(inds, key) && checkindex(Bool, value, inds[key]) == false
             return false
         end
     end
     for (key, value) in pairs(inds)
-        if (!haskey(ax, key)) && Base.checkindex(Bool, 1:1, value) == false
+        i = auto_axis_index(key)
+        if i !== nothing
+            left = i <= lengths(ax) ? ax[i] : Base.OneTo(1)
+            Base.checkindex(Bool, left, value) == false && return false
+        elseif (!haskey(ax, key)) && Base.checkindex(Bool, 1:1, value) == false
             return false
         end
     end
     true
 end
 
-function Base.checkbounds_indices(::Type{Bool}, ax::LabeledAxes, inds::Axes)
+function _checkbounds_indices(::Type{Bool}, ax::LabeledAxes, inds::Axes)
     _check_left(ax, inds) && _check_right(ax, inds)
 end
 _check_left(ax::NoAxes, inds::Axes) = true
 _check_left(ax::NoAxes, inds::NoAxes) = true
-_check_right(ax::Axes, inds::NoAxes) = true
+_check_right(ax::LabeledAxes, inds::NoAxes) = true
 _check_right(ax::NoAxes, inds::NoAxes) = true
 function _check_right(ax::NoAxes, inds::Axes)
-    rest = Base.tail(inds)   
-    name, value = first(labels(inds)), first(inds)
+    error("This makes no sense. It's just to ward off ambiguities")
 end
 function _check_left(ax::LabeledAxes, inds::Axes)
     rest = Base.tail(ax)   
     name, value = first(labels(ax)), first(ax)
     i = auto_axis_index(name)
-    if i !== nothing
+    if i !== nothing && i <= length(inds)
         Base.checkindex(Bool, value, inds[i]) && _check_left(rest, inds)
+    elseif i !== nothing
+        Base.checkindex(Bool, value, 1) && _check_left(rest, inds)
     elseif haskey(inds, name)
         Base.checkindex(Bool, value, inds[name]) && _check_left(rest, inds)
     else
@@ -137,8 +139,10 @@ function _check_right(ax::LabeledAxes, inds::Axes)
     rest = Base.tail(inds)   
     name, value = first(labels(inds)), first(inds)
     i = auto_axis_index(name)
-    if i !== nothing
+    if i !== nothing && i <= length(ax)
         Base.checkindex(Bool, ax[i], value) && _check_right(ax, rest)
+    elseif i !== nothing
+        Base.checkindex(Bool, Base.OneTo(1), value) && _check_right(ax, rest)
     elseif haskey(ax, name)
         Base.checkindex(Bool, ax[name], value) && _check_right(ax, rest)
     else
