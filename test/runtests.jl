@@ -160,6 +160,10 @@ end
         @test combine_axes((a=2, c=4), NamedTuple()) == (a=2, c=4)
         @test combine_axes(NamedTuple(), (a=2, c=4)) == (a=2, c=4)
         @test_throws DimensionMismatch combine_axes((a=2, c=4), (a=2, c=5)) 
+
+        left = LabeledAxes(a=1:3, b=1:4)
+        right = LabeledAxes(c=1:3, a=1:5)
+        @test_throws DimensionMismatch combine_axes(left, right)
         
         args = ((a=1, b=2), (c=4, d=3), (d=3, a=2, e=2))
         @test LabeledArrays.broadcastshapes(args) == (a=2, b=2, c=4, d=3, e=2)
@@ -187,8 +191,37 @@ end
         @test Base.checkbounds_indices(Bool, la, (a=1, c=1, b=2)) == false
         @test Base.checkbounds_indices(Bool, la, (c=1, d=1))
         @test Base.checkbounds_indices(Bool, la, (c=5, d=1)) == false
+
+
+        au = LabeledArrays.AUTO_AXIS_NAMES[3]
+        la = LabeledAxes{(:a, :b, au)}((1:3, 1:1, 1:4))
+        @test Base.checkbounds_indices(Bool, la, (a=1, c=1))
+        @test Base.checkbounds_indices(Bool, la, (a=1, b=1, c=4))
+        @test Base.checkbounds_indices(Bool, la, (a=1, b=1, c=5)) == false
+
+        la = LabeledAxes(a = 1:3, b=1:1, c=1:4)
+        au = LabeledArrays.AUTO_AXIS_NAMES[3]
+        nt = NamedTuple{(:a, au, :b)}((1, 4, 1))
+        @test Base.checkbounds_indices(Bool, la, nt)
+        nt = NamedTuple{(:a, au, :b)}((1, 5, 1))
+        @test Base.checkbounds_indices(Bool, la, nt) == false
     end
 
+    @testset "broadcast axes" begin
+        A = LabeledArray(rand(-10:10, (3, 4, 5)), (:a, :b, :c))
+        B = LabeledArray(rand(-10:10, (3, 5)), (:a, :c))
+        bc = broadcast(+, A, B)
+        @test axes(bc) == LabeledAxes(a=1:3, b=1:4, c=1:5)
+
+        A = LabeledArray(rand(-10:10, (3, 4)), (:a, :b))
+        B = LabeledArray(rand(-10:10, (5, 3)), (:c, :a))
+        bc = broadcast(+, A, B)
+        @test axes(bc) == LabeledAxes(a=1:3, b=1:4, c=1:5)
+
+        A = LabeledArray(rand(-10:10, (3, 4)), (:a, :b))
+        bc = broadcast(+, A, rand(-10:10, (3, 4)))
+        @test axes(bc) == LabeledAxes(a=1:3, b=1:4)
+    end
 end
 
 end

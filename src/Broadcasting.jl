@@ -1,5 +1,5 @@
 const LBroadcasted = Broadcast.Broadcasted{Broadcast.ArrayStyle{A}} where A <: LabeledArray
-Base.BroadcastStyle(A::Type{<:LabeledArray}) = Broadcast.ArrayStyle{A}()
+Base.BroadcastStyle(::Type{<:LabeledArray}) = Broadcast.ArrayStyle{LabeledArray}()
 function Base.Broadcast.instantiate(bc::LBroadcasted{A}) where A
     axs = axes(bc)
     return LBroadcasted{A}(bc.f, bc.args, axs)

@@ -67,7 +67,7 @@ function Base.map(f::Function, nt::LabeledAxes{name}, nts::Axes...) where name
 end
 
 for func in (:firstindex, :lastindex, :length, :pairs,
-             :keys, :values, :isempty, :iterate)
+             :keys, :values, :isempty, :iterate, :propertynames)
 	@eval Base.$func(a::LabeledAxes) = $func(parent(a))
 end
 
@@ -85,7 +85,7 @@ end
 
 Base.getindex(ax::LabeledAxes, s::Symbol) = getproperty(ax, s)
 
-function Base.checkbounds_indices(::Type{Bool}, ax::LabeledAxes, I)
+function Base.checkbounds_indices(::Type{Bool}, ax::LabeledAxes, I::Tuple)
     Base.checkbounds_indices(Bool, values(ax), I)
 end
 
