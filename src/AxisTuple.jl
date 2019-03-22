@@ -90,28 +90,6 @@ function Base.checkbounds_indices(::Type{Bool}, ax::LabeledAxes, I)
 end
 
 function Base.checkbounds_indices(::Type{Bool}, ax::LabeledAxes, inds::Axes)
-    for (key, value) in pairs(ax)
-        i = auto_axis_index(key)
-        if i !== nothing
-            right = i <= lengths(inds) ? inds[i] : 1
-            Base.checkindex(Bool, value, right) == false && return false
-        elseif haskey(inds, key) && checkindex(Bool, value, inds[key]) == false
-            return false
-        end
-    end
-    for (key, value) in pairs(inds)
-        i = auto_axis_index(key)
-        if i !== nothing
-            left = i <= lengths(ax) ? ax[i] : Base.OneTo(1)
-            Base.checkindex(Bool, left, value) == false && return false
-        elseif (!haskey(ax, key)) && Base.checkindex(Bool, 1:1, value) == false
-            return false
-        end
-    end
-    true
-end
-
-function _checkbounds_indices(::Type{Bool}, ax::LabeledAxes, inds::Axes)
     _check_left(ax, inds) && _check_right(ax, inds)
 end
 _check_left(ax::NoAxes, inds::Axes) = true
