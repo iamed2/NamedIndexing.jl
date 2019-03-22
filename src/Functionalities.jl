@@ -50,7 +50,6 @@ function Base.similar(::Type{<: LabeledArray{T, N, A}}, dims::Axes) where {T, N,
     LabeledArray{keys(dims)}(similar(A, T, values(dims)))
 end
 
-
 for op in (:+, :-)
     @eval begin
         function (::typeof($op))(

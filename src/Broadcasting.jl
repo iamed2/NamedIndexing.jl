@@ -1,16 +1,17 @@
 const LBroadcasted = Broadcast.Broadcasted{Broadcast.ArrayStyle{A}} where A <: LabeledArray
 Base.BroadcastStyle(A::Type{<:LabeledArray}) = Broadcast.ArrayStyle{A}()
-Base.copy(bc::LBroadcasted) = bc
 function Base.Broadcast.instantiate(bc::LBroadcasted{A}) where A
     axs = axes(bc)
     return LBroadcasted{A}(bc.f, bc.args, axs)
 end
 Base.similar(bc::LBroadcasted) = similar(LabeledArray{T}, axes(bc))
-@inline Base.axes(bc::LBroadcasted) = _axes(bc, bc.axes)
-_axes(::Broadcast.Broadcasted, axes::Axes) = axes
-@inline function _axes(bc::Broadcast.Broadcasted, ::Nothing)
+@inline Base.axes(bc::Broadcast.Broadcasted{Nothing, <: Axes}) = _lbaxes(bc, bc.axes)
+@inline Base.axes(bc::LBroadcasted) = _lbaxes(bc, bc.axes)
+_lbaxes(::Broadcast.Broadcasted, axs::Axes) = axs
+@inline function _lbaxes(bc::Broadcast.Broadcasted, ::Nothing)
     broadcastshapes(map(axes, Base.Broadcast.cat_nested(bc)))
 end
+Broadcast.extrude(x::LabeledArray) = x
 function broadcastshapes(args)
     nts = tuple((u for u in args if u isa Axes)...)
     nt = reduce(combine_axes, nts; init=LabeledAxes())
@@ -41,3 +42,15 @@ function combine_axes(left::Axes, right::Axes)
     ))
 end
 
+Base.eachindex(bc::LBroadcasted) = _eachindex(axes(bc))
+Base.eachindex(bc::Broadcast.Broadcasted{Nothing, <: LabeledAxes}) = _eachindex(axes(bc))
+_eachindex(t::Tuple{Any}) = t[1]
+_eachindex(t::Tuple) = CartesianIndices(t)
+_eachindex(t::Axes) = LabeledCartesianIndices(t)
+
+function Base.similar(bc::LBroadcasted, T::Type)
+    ax = axes(bc)
+    N = length(ax)
+    similar(LabeledArray{T, N, Array{T, N}, labels(ax)}, values(ax))
+end
+Base.copy(bc::LBroadcasted) = bc

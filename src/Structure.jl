@@ -1,9 +1,9 @@
-struct LabeledArray{T, N, A <: AbstractArray{T, N}, Names} <: AbstractArray{T, N}
+struct LabeledArray{T, N, A <: AbstractArray{T, N}, Labels} <: AbstractArray{T, N}
     data::A
 end
 
-function LabeledArray{Names}(data::AbstractArray{T, N}) where {T, N, Names}
-    names = generate_axis_names(Names, Val{ndims(data)}())
+function LabeledArray{Labels}(data::AbstractArray{T, N}) where {T, N, Labels}
+    names = generate_axis_names(Labels, Val{ndims(data)}())
     LabeledArray{T, N, typeof(data), names}(data)
 end
 function LabeledArray(data::AbstractArray{T, N1},
@@ -11,6 +11,10 @@ function LabeledArray(data::AbstractArray{T, N1},
     LabeledArray{T, N1, typeof(data), generate_axis_names(names, Val{N1}())}(data)
 end
 LabeledArray(data::AbstractArray) = LabeledArray(data, labels(data))
+function LabeledArray{T, N, A, Labels}(
+                        ::UndefInitializer, dims::Tuple) where {T, N, A, Labels}
+    LabeledArray{Labels}(A(UndefInitializer(), dims))
+end
 
 const LabelledArray = LabeledArray # for the brit inside each of us
 
@@ -63,18 +67,6 @@ function remaining_labels(array::Type{<:AbstractArray}, axes::Type{<:NamedTuple}
     tuple((n in AUTO_AXIS_NAMES ? AUTO_AXIS_NAMES[i] : n
            for (i, (n, t)) in enumerate(zip(names, types))
            if IndexType(array, t) isa VectorIndex)...)
-end
-
-""" Auto-generated axis name.
-
-In practice, each name is paired with a single axis number. E.g. axis 1 will always have the
-same name across a session. However, form one session to the next, the names may change.
-"""
-const AUTO_AXIS_NAMES = let
-    names = ("lapin", "rat", "corbeau", "cochon", "saumon", "cafard", "dauphin")
-    attributes = ("rose", "noir", "abile", "séché", "salubre", "émue", "sucré")
-    a = [Symbol("_" * name * "_" * attribute) for name in names, attribute in attributes]
-    tuple(shuffle(a)...)
 end
 
 """ Creates the full set of indices for the array """

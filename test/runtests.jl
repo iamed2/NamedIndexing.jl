@@ -181,6 +181,14 @@ end
         @test_throws DimensionMismatch LabeledArrays.broadcastshapes(args)
     end
 
+    @testset "check bounds" begin
+        la = LabeledAxes(a = 1:3, b=1:1, c=1:4)
+        @test Base.checkbounds_indices(Bool, la, (a=1, c=1))
+        @test Base.checkbounds_indices(Bool, la, (a=1, c=1, b=2)) == false
+        @test Base.checkbounds_indices(Bool, la, (c=1, d=1))
+        @test Base.checkbounds_indices(Bool, la, (c=5, d=1)) == false
+    end
+
 end
 
 end

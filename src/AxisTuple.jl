@@ -14,6 +14,8 @@ LabeledAxes(; kwargs...) = LabeledAxes(kwargs.data)
 NamedTuple(nt::LabeledAxes) = parent(nt)
 LabeledAxes{Labels}(t::Tuple) where Labels = LabeledAxes(NamedTuple{Labels}(t))
 labels(::LabeledAxes{Labels}) where Labels = Labels
+labels(::NamedTuple{Labels}) where Labels = Labels
+labels(::Type{<: NamedTuple{Labels}}) where Labels = Labels
 labels(::Type{<: LabeledAxes{Labels}}) where Labels = Labels
 function dims2string(inds::NamedTuple)
     if length(inds) < 0
@@ -69,7 +71,7 @@ for func in (:firstindex, :lastindex, :length, :pairs,
 	@eval Base.$func(a::LabeledAxes) = $func(parent(a))
 end
 
-Base.tail(a::LabeledAxes) = LabeledAxes(Base.tail(parent(a)))
+Base.tail(a::LabeledAxes) = LabeledAxes{Base.tail(labels(a))}(Base.tail(values(a)))
 
 for f in (:isless, :isequal, :merge, :(==))
 	@eval begin
@@ -81,6 +83,65 @@ for f in (:isless, :isequal, :merge, :(==))
     end
 end
 
+Base.getindex(ax::LabeledAxes, s::Symbol) = getproperty(ax, s)
+
 function Base.checkbounds_indices(::Type{Bool}, ax::LabeledAxes, I)
     Base.checkbounds_indices(Bool, values(ax), I)
+end
+
+function _checkbounds_indices(::Type{Bool}, ax::LabeledAxes, inds::Axes)
+    for (key, value) in pairs(ax)
+        i = auto_axis_index(key)
+        if i !== nothing
+            if i < length(inds)
+               if Base.checkindex(Bool, value, inds[i]) == false
+                en
+            end
+            return false
+        elseif haskey(inds, key) && checkindex(Bool, value, inds[key]) == false
+            return false
+        end
+    end
+    for (key, value) in pairs(inds)
+        if (!haskey(ax, key)) && Base.checkindex(Bool, 1:1, value) == false
+            return false
+        end
+    end
+    true
+end
+
+function Base.checkbounds_indices(::Type{Bool}, ax::LabeledAxes, inds::Axes)
+    _check_left(ax, inds) && _check_right(ax, inds)
+end
+_check_left(ax::NoAxes, inds::Axes) = true
+_check_left(ax::NoAxes, inds::NoAxes) = true
+_check_right(ax::Axes, inds::NoAxes) = true
+_check_right(ax::NoAxes, inds::NoAxes) = true
+function _check_right(ax::NoAxes, inds::Axes)
+    rest = Base.tail(inds)   
+    name, value = first(labels(inds)), first(inds)
+end
+function _check_left(ax::LabeledAxes, inds::Axes)
+    rest = Base.tail(ax)   
+    name, value = first(labels(ax)), first(ax)
+    i = auto_axis_index(name)
+    if i !== nothing
+        Base.checkindex(Bool, value, inds[i]) && _check_left(rest, inds)
+    elseif haskey(inds, name)
+        Base.checkindex(Bool, value, inds[name]) && _check_left(rest, inds)
+    else
+        _check_left(rest, inds)
+    end
+end
+function _check_right(ax::LabeledAxes, inds::Axes)
+    rest = Base.tail(inds)   
+    name, value = first(labels(inds)), first(inds)
+    i = auto_axis_index(name)
+    if i !== nothing
+        Base.checkindex(Bool, ax[i], value) && _check_right(ax, rest)
+    elseif haskey(ax, name)
+        Base.checkindex(Bool, ax[name], value) && _check_right(ax, rest)
+    else
+        _check_right(ax, rest)
+    end
 end
