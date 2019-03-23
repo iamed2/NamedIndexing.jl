@@ -3,12 +3,14 @@ struct LabeledArray{T, N, A <: AbstractArray{T, N}, Labels} <: AbstractArray{T, 
 end
 
 function LabeledArray{Labels}(data::AbstractArray{T, N}) where {T, N, Labels}
-    names = generate_axis_names(Labels, Val{ndims(data)}())
-    LabeledArray{T, N, typeof(data), names}(data)
+    if N > length(Labels)
+        throw(DimensionMismatch("Too few labels on input"))
+    end
+    lbls = first(Base.IteratorsMD.split(Labels, Val{N}()))
+    LabeledArray{T, N, typeof(data), lbls}(data)
 end
-function LabeledArray(data::AbstractArray{T, N1},
-                      names::NTuple{N2, Symbol}) where {T, N1, N2}
-    LabeledArray{T, N1, typeof(data), generate_axis_names(names, Val{N1}())}(data)
+function LabeledArray(data::AbstractArray{T, N}, names::NTuple{N, Symbol}) where {T, N}
+    LabeledArray{T, N, typeof(data), names}(data)
 end
 LabeledArray(data::AbstractArray) = LabeledArray(data, labels(data))
 function LabeledArray{T, N, A, Labels}(
@@ -39,11 +41,8 @@ end
 """ Labels attached to the axis of an array """
 @inline labels(array::LabeledArray{T, N, A, S}) where {T, N, A, S} = S
 @inline labels(array::Type{LabeledArray{T, N, A, S}}) where {T, N, A, S} = S
-@inline labels(array::AbstractArray) = AUTO_AXIS_NAMES[1:ndims(array)]
 @inline labels(array::LabeledArray{T, N, A, S}, i::Integer) where {T, N, A, S} = S[i]
 @inline labels(array::Type{LabeledArray{T, N, A, S}}, i::Integer) where {T, N, A, S} = S[i]
-@inline labels(array::AbstractArray, i::Integer) = AUTO_AXIS_NAMES[i]
-@inline labels(i::Integer) = AUTO_AXIS_NAMES[i]
 
 abstract type IndexType end
 struct DecayingIndex  <: IndexType end
@@ -57,16 +56,11 @@ IndexType(::Type{<:AbstractArray}, ::Type{<:AbstractString}) = DecayingIndex()
 IndexType(::Type{<:AbstractArray}, ::Type{<:AbstractChar}) = DecayingIndex()
 IndexType(::Type{<:AbstractArray}, ::Type{<:Symbol}) = DecayingIndex()
 
-""" Tuple of remaining axes
-
-Also relables automated names to their location in the auto label list.
-"""
+""" Tuple of non-scalar axes. """
 function remaining_labels(array::Type{<:AbstractArray}, axes::Type{<:NamedTuple})
     names = fieldnames(axes)
     types = fieldtypes(axes)
-    tuple((n in AUTO_AXIS_NAMES ? AUTO_AXIS_NAMES[i] : n
-           for (i, (n, t)) in enumerate(zip(names, types))
-           if IndexType(array, t) isa VectorIndex)...)
+    tuple((n for (n, t) in zip(names, types) if IndexType(array, t) isa VectorIndex)...)
 end
 
 """ Creates the full set of indices for the array """
@@ -78,8 +72,6 @@ function Base.to_indices(array::LabeledArray, indices::Axes)
         getname(name, i) = begin
             if name in inames
                 :($name = indices.$name)
-            elseif AUTO_AXIS_NAMES[i] in inames
-                :($name = indices.$(AUTO_AXIS_NAMES[i]))
             else
                 :($name = Colon())
             end
@@ -98,37 +90,18 @@ function Base.to_indices(array::LabeledArray, indices::Axes)
     end
 end
 
-""" Generate a tuple of labels of length N2
-
-Auto generates name or truncates initial tuple, as required.
-"""
-function generate_axis_names(initial::NTuple{N1, Symbol},
-                             ::Val{N2})::NTuple{N2, Symbol} where {N1, N2}
-    if @generated
-        Expr(:tuple,
-             (:(initial[$i]) for i in 1:min(N2, N1))...,
-             (QuoteNode(AUTO_AXIS_NAMES[i]) for i in N1 + 1:N2)...
-        )
-    elseif N1 == N2
-        initial
-    elseif N1 < N2
-        tuple(initial..., AUTO_AXIS_NAMES[N1 + 1:N2]...)
-    else
-        initial[1:N2]
-    end
-end
-
-function generate_axis_names(array::LabeledArray, val::Val)
-    generate_axis_names(labels(array), val)
-end
-
 Base.getindex(array::LabeledArray; kwargs...) = getindex(array, kwargs.data)
 function Base.getindex(array::LabeledArray, index::Union{Int, CartesianIndex})
     getindex(parent(array), index)
 end
-function Base.getindex(array::LabeledArray, I...)
-    indices = NamedTuple{generate_axis_names(array, Val{length(I)}())}(I)
-    getindex(array, indices)
+Base.@propagate_inbounds @inline function Base.getindex(array::LabeledArray, I...)
+    if length(I) > ndims(array)
+        msg = ("Cannot index labeled array with more than "
+               * "$(ndims(array)) unlabeled indices.")
+        throw(DimensionMismatch(msg))
+    end
+    lbls = first(Base.IteratorsMD.split(labels(array), Val{length(I)}()))
+    getindex(array, NamedTuple{lbls}(I))
 end
 function Base.getindex(array::LabeledArray, indices::Axes)
     fullinds = to_indices(array, indices)
@@ -149,8 +122,13 @@ end
 Base.view(array::LabeledArray; kwargs...) = view(array, kwargs.data)
 Base.view(array::LabeledArray, index::Int) = view(parent(array), index)
 function Base.view(array::LabeledArray, I...)
-    indices = NamedTuple{generate_axis_names(array, Val{length(I)}())}(I)
-    view(array, indices)
+    if length(I) > ndims(array)
+        msg = ("Cannot index labeled array with more than "
+               * "$(ndims(array)) unlabeled indices.")
+        throw(DimensionMismatch(msg))
+    end
+    lbls = first(Base.IteratorsMD.split(labels(array), Val{length(I)}()))
+    view(array, NamedTuple{lbls}(I))
 end
 function Base.view(array::LabeledArray, indices::Axes)
     fullinds = to_indices(array, indices)

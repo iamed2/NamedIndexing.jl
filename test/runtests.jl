@@ -19,17 +19,15 @@ end
         @test subarray.data == A.data
     end
 
-    cases = [(1,), (1, 1, 1), (1, 2)]
+    cases = [(1,), (1, 1), (1, 2)]
     @testset "standard indexing: $args" for args in cases
         subarray = @inferred A[args...]
         @test subarray isa Integer
         @test subarray == A.data[args...]
     end
+    @test_throws DimensionMismatch A[1, 1, 1]
 
-    cases = begin
-        [(:foo,) => (1:1, 2), (:bar,) => (1, 1:1), (:foo, :bar) => (1:1, 1:1),
-             (:foo, LabeledArrays.AUTO_AXIS_NAMES[3]) => (1:1, 2, 1:1)]
-    end
+    cases = [(:foo,) => (1:1, 2), (:bar,) => (1, 1:1), (:foo, :bar) => (1:1, 1:1)]
     @testset "standard indexing: $args" for (axisnames, args) in cases
         subarray = @inferred A[args...]
         @test axisnames == labels(subarray)
@@ -50,13 +48,6 @@ end
         @test labels(A[foo=1:2, bear=1]) == (:foo, :bar)
         @test @inferred(A[foo=1:2, bear=:]) == A.data[1:2, :, :]
         @test labels(A[foo=1:2, bear=:]) == (:foo, :bar, :bear)
-    end
-
-    @testset "check relabeling" begin
-        args = [:bar=>1:2, :foo=>2, LabeledArrays.AUTO_AXIS_NAMES[1]=>:]
-        subarray = @inferred getindex(A; args...)
-        @test subarray.data == A.data[2, 1:2, :]
-        @test labels(subarray) == (:bar, LabeledArrays.AUTO_AXIS_NAMES[3])
     end
 
 end
@@ -92,8 +83,6 @@ end
     A = LabeledArray(rand(-10:10, (3, 4, 2)), (:a, :b, :c))
     @test permutedims(A, (1, 3, 2)) == permutedims(A, (1, 3, 2))
     @test permutedims(A, (1, :c, 2)) == permutedims(A, (1, 3, 2))
-    ax = LabeledArrays.AUTO_AXIS_NAMES[2]
-    @test permutedims(A, (1, :c, ax)) == permutedims(A, (1, 3, 2))
 end
 
 @testset "view" begin
@@ -151,6 +140,7 @@ end
 
 @testset "Broadcasting" begin
     combine_axes(a...) = LabeledArrays.combine_axes(a...)
+    LabeledAxes = LabeledArrays.LabeledAxes
 
     @testset "unify shapes" begin
         @test combine_axes((a=2, b=3, c=4), (a=2, b=3, c=4)) == (a=2, b=3, c=4)
@@ -191,20 +181,6 @@ end
         @test Base.checkbounds_indices(Bool, la, (a=1, c=1, b=2)) == false
         @test Base.checkbounds_indices(Bool, la, (c=1, d=1))
         @test Base.checkbounds_indices(Bool, la, (c=5, d=1)) == false
-
-
-        au = LabeledArrays.AUTO_AXIS_NAMES[3]
-        la = LabeledAxes{(:a, :b, au)}((1:3, 1:1, 1:4))
-        @test Base.checkbounds_indices(Bool, la, (a=1, c=1))
-        @test Base.checkbounds_indices(Bool, la, (a=1, b=1, c=4))
-        @test Base.checkbounds_indices(Bool, la, (a=1, b=1, c=5)) == false
-
-        la = LabeledAxes(a = 1:3, b=1:1, c=1:4)
-        au = LabeledArrays.AUTO_AXIS_NAMES[3]
-        nt = NamedTuple{(:a, au, :b)}((1, 4, 1))
-        @test Base.checkbounds_indices(Bool, la, nt)
-        nt = NamedTuple{(:a, au, :b)}((1, 5, 1))
-        @test Base.checkbounds_indices(Bool, la, nt) == false
     end
 
     @testset "broadcast axes" begin

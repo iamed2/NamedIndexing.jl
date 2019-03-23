@@ -1,9 +1,7 @@
 Base.dataids(a::LabeledArray) = Base.dataids(parent(a))
 function Base.permutedims(array::LabeledArray, axes::Any)
     names = indexin(axes, collect(labels(array)))
-    autos = indexin(axes, collect(AUTO_AXIS_NAMES))
-    dims = [u === nothing ? (autos[i] === nothing ? axes[i] : autos[i]) : u
-            for (i, u) in enumerate(names)]
+    dims = [u === nothing ? axes[i] : u for (i, u) in enumerate(names)]
     data = permutedims(parent(array), dims)
     LabeledArray(data, tuple(collect(labels(array))[dims]...))
 end

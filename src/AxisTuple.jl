@@ -102,29 +102,13 @@ end
 function _check_left(ax::LabeledAxes, inds::Axes)
     rest = Base.tail(ax)   
     name, value = first(labels(ax)), first(ax)
-    i = auto_axis_index(name)
-    if i !== nothing && i <= length(inds)
-        Base.checkindex(Bool, value, inds[i]) && _check_left(rest, inds)
-    elseif i !== nothing
-        Base.checkindex(Bool, value, 1) && _check_left(rest, inds)
-    elseif haskey(inds, name)
-        Base.checkindex(Bool, value, inds[name]) && _check_left(rest, inds)
-    else
-        _check_left(rest, inds)
-    end
+    index! = (!haskey(inds, name)) || Base.checkindex(Bool, value, inds[name])
+    index! && _check_left(rest, inds)
 end
 function _check_right(ax::LabeledAxes, inds::Axes)
     rest = Base.tail(inds)   
     name, value = first(labels(inds)), first(inds)
-    i = auto_axis_index(name)
-    if i !== nothing && i <= length(ax)
-        Base.checkindex(Bool, ax[i], value) && _check_right(ax, rest)
-    elseif i !== nothing
-        Base.checkindex(Bool, Base.OneTo(1), value) && _check_right(ax, rest)
-    elseif haskey(ax, name)
-        Base.checkindex(Bool, ax[name], value) && _check_right(ax, rest)
-    else
-        _check_right(ax, rest)
-    end
+    index! =  (!haskey(ax, name)) || Base.checkindex(Bool, ax[name], value)
+    index! && _check_right(ax, rest)
 end
 Base.reverse(ax::LabeledAxes) = LabeledAxes{reverse(labels(ax))}(reverse(parent(ax)))
