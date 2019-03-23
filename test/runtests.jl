@@ -171,6 +171,13 @@ end
         @test LabeledArrays.broadcastshapes(args) == (a=4, b=2, c=4, d=3)
         args = ((a=4, b=2), (a=4, b=1, c=4, d=3), (4, 2, 4))
         @test LabeledArrays.broadcastshapes(args) == (a=4, b=2, c=4, d=3)
+        args = ((a=4, b=2), (a=4, b=1, c=4, d=3), (4, 2, 4, 3))
+        @test LabeledArrays.broadcastshapes(args) == (a=4, b=2, c=4, d=3)
+        
+        # Can't figure out name of fith implicit index
+        args = ((a=4, b=2), (a=4, b=1, c=4, d=3), (4, 2, 4, 3, 1))
+        @test_throws DimensionMismatch LabeledArrays.broadcastshapes(args)
+        # which is the second index? is it b or c?
         args = ((a=4, b=2), (a=4, c=4, b=1, d=3), (4, 2, 4))
         @test_throws DimensionMismatch LabeledArrays.broadcastshapes(args)
     end
