@@ -127,3 +127,4 @@ function _check_right(ax::LabeledAxes, inds::Axes)
         _check_right(ax, rest)
     end
 end
+Base.reverse(ax::LabeledAxes) = LabeledAxes{reverse(labels(ax))}(reverse(parent(ax)))

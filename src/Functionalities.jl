@@ -129,3 +129,7 @@ Base.eachindex(::IndexLabeledCartesian, A::AbstractArray) = CartesianIndices(axe
 Base.eachindex(::IndexLabeledCartesian, A::LabeledArray) = LabeledCartesianIndices(axes(A))
 
 unlabel(array::LabeledArray) = parent(array)
+
+function Base.reverse(array::LabeledArray; dims::Integer)
+    LabeledArray{labels(A)}(reverse(parent(A); dims=dims))
+end
