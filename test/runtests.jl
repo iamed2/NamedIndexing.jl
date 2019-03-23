@@ -10,7 +10,7 @@ end
 
 @testset "indexing" begin
 
-    A = LabeledArray(rand(-10:10, (3, 2)), (:foo, :bar))
+    A = @inferred LabeledArray{(:foo, :bar)}(rand(-10:10, (3, 2)))
 
     colons = [(foo=:, bar=:), (bar=:, foo=:), (bar=:,), (foo=:,), (bar=:, axis3=1)]
     @testset "colons: $nt" for nt in colons
@@ -83,11 +83,12 @@ end
     A = LabeledArray(rand(-10:10, (3, 4, 2)), (:a, :b, :c))
     @test permutedims(A, (1, 3, 2)) == permutedims(A, (1, 3, 2))
     @test permutedims(A, (1, :c, 2)) == permutedims(A, (1, 3, 2))
+    @test permutedims(A, (:a, :c, :b)) == permutedims(A, (1, 3, 2))
 end
 
 @testset "view" begin
     A = LabeledArray(rand(-10:10, (3, 4, 2)), (:a, :b, :c))
-    @test parent(view(A, b=1, a=1:2)) == view(parent(A), 1:2, 1, :)
+    @test parent(@inferred(view(A, b=1, a=1:2))) == view(parent(A), 1:2, 1, :)
     @test labels(view(A, b=1, a=1:2)) == (:a, :c)
 end
 
@@ -213,8 +214,39 @@ end
         @test max.(A, 2) .+ 1 isa LabeledArray
         @test max.(A, 2) .+ 1 == max.(parent(A), 2) .+ 1
         @test labels(max.(A, 2) .+ 1) == labels(A)
+
+        A = LabeledArray(rand(-10:10, (3, 4)), (:a, :b))
         B = LabeledArray(rand(-10:10, (5, 3)), (:c, :a))
         @test A .+ B == parent(A) .+ reshape(transpose(parent(B)), (3, 1, 5))
+
+        A = LabeledArray(rand(-10:10, (3, 4)), (:a, :b))
+        B = rand(-10:10, size(A, :a))
+        @test A .+ B == parent(A) .+ B
+
+        A = LabeledArray(rand(-10:10, (3, 4)), (:a, :b))
+        B = rand(-10:10, (1, size(A, :b)))
+        @test A .+ B == parent(A) .+ B
+
+        A = LabeledArray(rand(-10:10, (3, 4, 5)), (:a, :b, :c))
+        B = rand(-10:10, (1, size(A, :b)))
+        @test A .+ B == parent(A) .+ B
+
+        A = LabeledArray(rand(-10:10, (3, 4, 5)), (:a, :b, :c))
+        B = rand(-10:10, (size(A, :a), size(A, :b)))
+        @test A .+ B == parent(A) .+ B
+
+        A = LabeledArray(rand(-10:10, (3, 4, 5)), (:a, :b, :c))
+        A′ = deepcopy(parent(A))
+        B = rand(-10:10, (size(A, :a), size(A, :b)))
+        A .= B
+        A′ .= B
+        @test A == A′
+
+        A = LabeledArray(rand(-10:10, (3, 4, 5)), (:a, :b, :c))
+        B = LabeledArray(rand(-10:10, (5, 3)), (:c, :a))
+        C = LabeledArray{(:b,)}(rand(-10:10, 4))
+        A .= B .* C
+        @test A == reshape(transpose(parent(B)), (3, 1, 5))  .* reshape(parent(C), (1, 4))
     end
 
 end

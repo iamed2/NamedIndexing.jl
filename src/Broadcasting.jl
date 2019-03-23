@@ -75,6 +75,9 @@ end
 function Broadcast.newindex(array::LabeledArray, I::LabeledCartesianIndex)
     LabeledCartesianIndex{labels(array)}(Tuple(getproperty(I, s) for s in labels(array)))
 end
+function Broadcast.newindex(I::LabeledCartesianIndex, keep, Idefault)
+    Broadcast.newindex(CartesianIndex(values(I)), keep, Idefault)
+end
 function Broadcast.newindex(arg::Any, I::LabeledCartesianIndex)
     Broadcast.newindex(CartesianIndex(I))
 end
