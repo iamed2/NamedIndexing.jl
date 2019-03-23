@@ -99,7 +99,7 @@ end
     @test size(similar(A)) == size(A)
     @test eltype(similar(A)) == eltype(A)
 
-    @test labels(similar(A, bar=2)) == (:bar,)
+    @test labels(@inferred(similar(A, bar=2))) == (:bar,)
     @test size(similar(A, bar=2)) == (2,)
     @test eltype(similar(A, bar=2)) == eltype(A)
 

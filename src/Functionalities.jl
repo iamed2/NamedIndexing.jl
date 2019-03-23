@@ -24,7 +24,7 @@ function Base.similar(array::LabeledArray, T::Type, dims::NTuple{N, Int64}) wher
     LabeledArray{labels(array)}(similar(parent(array), T, dims))
 end
 function Base.similar(array::LabeledArray, T::Type, dims::Axes)
-    LabeledArray{keys(dims)}(similar(parent(array), T, dims...))
+    LabeledArray{labels(dims)}(similar(parent(array), T, values(dims)))
 end
 Base.similar(a::LabeledArray, dims::Axes) = similar(a, eltype(a), dims)
 Base.similar(array::LabeledArray; kwargs...) = similar(array, kwargs.data)
