@@ -19,6 +19,8 @@ function LabeledCartesianIndices{Labels}(x::Tuple) where Labels
 end
 LabeledCartesianIndices(x::LabeledAxes) = LabeledCartesianIndices{labels(x)}(values(x))
 LabeledCartesianIndices(x::NamedTuple) = LabeledCartesianIndices{keys(x)}(Tuple(x))
+LabeledAxes(lcis::LCIs) = LabeledAxes{labels(lcis)}(Tuple(parent(lcis)...))
+Base.CartesianIndex(lci::LCI) = CartesianIndex(values(lci))
 
 Base.parent(lcis::LCIs) = getfield(lcis, :inds)
 @inline Base.iterate(iter::LCIs) = _iterate(iterate(parent(iter)))
@@ -69,4 +71,8 @@ function Base.SubArray(::IndexLabeledCartesian,
                        parent::P, indices::I, nt::NTuple{N,Any}) where {P,I,N}
     Base.@_inline_meta
     Base.SubArray(IndexCartesian(), parent, indices, nt)
+end
+
+function Base.checkbounds_indices(::Type{Bool}, ax::LabeledAxes, I::LCIs)
+    Base.checkbounds_indices(Bool, ax, LabeledAxes(I))
 end

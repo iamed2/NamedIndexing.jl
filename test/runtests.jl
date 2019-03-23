@@ -210,18 +210,30 @@ end
     @testset "broadcast axes" begin
         A = LabeledArray(rand(-10:10, (3, 4, 5)), (:a, :b, :c))
         B = LabeledArray(rand(-10:10, (3, 5)), (:a, :c))
-        bc = broadcast(+, A, B)
+        bc = Broadcast.broadcasted(+, A, B)
         @test axes(bc) == LabeledAxes(a=1:3, b=1:4, c=1:5)
 
         A = LabeledArray(rand(-10:10, (3, 4)), (:a, :b))
         B = LabeledArray(rand(-10:10, (5, 3)), (:c, :a))
-        bc = broadcast(+, A, B)
+        bc = Broadcast.broadcasted(+, A, B)
         @test axes(bc) == LabeledAxes(a=1:3, b=1:4, c=1:5)
 
         A = LabeledArray(rand(-10:10, (3, 4)), (:a, :b))
-        bc = broadcast(+, A, rand(-10:10, (3, 4)))
+        bc = Broadcast.broadcasted(+, A, rand(-10:10, (3, 4)))
         @test axes(bc) == LabeledAxes(a=1:3, b=1:4)
     end
+
+    @testset "broadcasting per-se" begin
+        A = LabeledArray(rand(-10:10, (3, 4)), (:a, :b))
+        @test A .+ 1 == parent(A) .+ 1
+        @test labels(A .+ 1) == labels(A)
+        @test max.(A, 2) .+ 1 isa LabeledArray
+        @test max.(A, 2) .+ 1 == max.(parent(A), 2) .+ 1
+        @test labels(max.(A, 2) .+ 1) == labels(A)
+        B = LabeledArray(rand(-10:10, (5, 3)), (:c, :a))
+        @test A .+ B == parent(A) .+ reshape(transpose(parent(B)), (3, 1, 5))
+    end
+
 end
 
 end

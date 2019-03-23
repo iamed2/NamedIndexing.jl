@@ -11,6 +11,7 @@ _lbaxes(::Broadcast.Broadcasted, axs::Axes) = axs
 @inline function _lbaxes(bc::Broadcast.Broadcasted, ::Nothing)
     broadcastshapes(map(axes, Base.Broadcast.cat_nested(bc)))
 end
+labels(bc::LBroadcasted) = labels(axes(bc))
 Broadcast.extrude(x::LabeledArray) = x
 function broadcastshapes(args)
     nts = tuple((u for u in args if u isa Axes)...)
@@ -53,4 +54,27 @@ function Base.similar(bc::LBroadcasted, T::Type)
     N = length(ax)
     similar(LabeledArray{T, N, Array{T, N}, labels(ax)}, values(ax))
 end
-Base.copy(bc::LBroadcasted) = bc
+
+@inline function Base.checkbounds(bc::LBroadcasted, I::CartesianIndex)
+    checkbounds(bc, LabeledCartesianIndex{labels(bc)}(I))
+end
+@inline function Base.checkbounds(bc::LBroadcasted, lci::Axes)
+    Base.checkbounds_indices(Bool, axes(bc), lci) || Base.throw_boundserror(bc, lci)
+end
+
+Base.@propagate_inbounds function Base.getindex(bc::LBroadcasted,
+                                                i1::Integer, i2::Integer,
+                                                I::Integer...)
+    bc[LabeledCartesianIndex{labels(bc)}((i1, i2, I...))]
+end
+@inline function Base.getindex(bc::Broadcast.Broadcasted, I::LabeledCartesianIndex)
+    @boundscheck checkbounds(bc, I)
+    @inbounds Broadcast._broadcast_getindex(bc, I)
+end
+
+function Broadcast.newindex(array::LabeledArray, I::LabeledCartesianIndex)
+    LabeledCartesianIndex{labels(array)}(Tuple(getproperty(I, s) for s in labels(array)))
+end
+function Broadcast.newindex(arg::Any, I::LabeledCartesianIndex)
+    Broadcast.newindex(CartesianIndex(I))
+end

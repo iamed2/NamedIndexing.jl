@@ -71,9 +71,9 @@ end
 
 """ Creates the full set of indices for the array """
 Base.to_indices(a::LabeledArray, inds::LabeledArray) = to_indices(array, parent(inds))
-function Base.to_indices(array::LabeledArray, indices::NamedTuple)
+function Base.to_indices(array::LabeledArray, indices::Axes)
     if @generated
-        inames = fieldnames(indices)
+        inames = labels(indices)
 
         getname(name, i) = begin
             if name in inames
