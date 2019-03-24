@@ -74,28 +74,12 @@ end
 """ Creates the full set of indices for the array """
 Base.to_indices(a::LabeledArray, inds::LabeledArray) = to_indices(array, parent(inds))
 function Base.to_indices(array::LabeledArray, indices::Axes)
-    if @generated
-        inames = labels(indices)
-
-        getname(name, i) = begin
-            if name in inames
-                :($name = indices.$name)
-            else
-                :($name = Colon())
-            end
-        end
-
-        items = [getname(name, i) for (i, name) in enumerate(labels(array))]
-        extras = [:($name=indices.$name) for name in inames if !(name in labels(array))]
-        Expr(:tuple, items..., extras...)
-    else
-        Names = labels(array)
-        N = ndims(array)
-        merge(
-            NamedTuple{Names, NTuple{N, Colon}}(ntuple((_) -> (:), Val{N}())),
-            indices
-        )
-    end
+    Names = labels(array)
+    N = ndims(array)
+    merge(
+        NamedTuple{Names, NTuple{N, Colon}}(ntuple((_) -> (:), Val{N}())),
+        indices
+    )
 end
 
 Base.getindex(array::LabeledArray; kwargs...) = getindex(array, kwargs.data)
