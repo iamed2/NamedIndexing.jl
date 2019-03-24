@@ -62,6 +62,14 @@ function remaining_labels(array::Type{<:AbstractArray}, axes::Type{<:NamedTuple}
     types = fieldtypes(axes)
     tuple((n for (n, t) in zip(names, types) if IndexType(array, t) isa VectorIndex)...)
 end
+Base.@propagate_inbounds remaining_labels(array::AbstractArray, axes::NoAxes) = ()
+Base.@propagate_inbounds function remaining_labels(array::AbstractArray, axes::Axes)
+    if IndexType(array, first(axes)) isa VectorIndex
+        (first(labels(axes)), remaining_labels(array, Base.tail(axes))...)
+    else
+        remaining_labels(array, Base.tail(axes))
+    end
+end
 
 """ Creates the full set of indices for the array """
 Base.to_indices(a::LabeledArray, inds::LabeledArray) = to_indices(array, parent(inds))
@@ -106,16 +114,16 @@ end
 function Base.getindex(array::LabeledArray, indices::Axes)
     fullinds = to_indices(array, indices)
     newdata = getindex(parent(array), values(fullinds)...)
-    _get_index(array, newdata, fullinds)
+    _getindex(array, newdata, fullinds)
 end
-_get_index(array::LabeledArray{T}, newdata::T, ::Axes) where T = newdata
-function _get_index(array::LabeledArray, data::AbstractArray, inds::NamedTuple)
+_getindex(array::LabeledArray{T}, newdata::T, ::Axes) where T = newdata
+function _getindex(array::LabeledArray, data::AbstractArray, inds::NamedTuple)
     if @generated
-        names = remaining_labels(array, inds)
+        names = remaining_labels(data, inds)
         T  = eltype(data)
         :(LabeledArray{$T, $(ndims(data)), $data, $names}(data))
     else
-        LabeledArray(data, remaining_labels(typeof(array), typeof(inds)))
+        LabeledArray{remaining_labels(data, inds)}(data)
     end
 end
 
@@ -137,11 +145,11 @@ function Base.view(array::LabeledArray, indices::Axes)
 end
 function _view(array::LabeledArray, newdata::AbstractArray, indices::NamedTuple)
     if @generated
-        names = remaining_labels(array, indices)
+        names = remaining_labels(newdata, indices)
         T  = eltype(newdata)
         :(LabeledArray{$T, $(ndims(newdata)), $newdata, $names}(newdata))
     else
-        LabeledArray(newdata, remaining_labels(typeof(array), typeof(indices)))
+        LabeledArray{remaining_labels(newdata, indices)}(newdata)
     end
 end
 
